@@ -20,10 +20,38 @@
 <h1>bazelex</h1>
 <p class="note">Database: <code>{{.DB}}</code>. Results are limited to {{.Limit}} rows.</p>
 <datalist id="labels">{{range .Labels}}<option value="{{.}}">{{end}}</datalist>
-<form method="get">
-{{range .Queries}}
+
+{{define "result"}}
+  {{if .Err}}<p class="err">{{.Err}}</p>
+  {{else if .Ran}}
+    {{if .Rows}}
+    <table>
+      <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
+      {{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
+    </table>
+    {{if .Truncated}}<p class="note">Truncated to the first {{.Limit}} rows.</p>{{end}}
+    {{else}}<p class="note">No rows.</p>{{end}}
+  {{end}}
+{{end}}
+
+<h2>Self-contained queries</h2>
+<p class="note">These need no input.</p>
+{{range .SelfContained}}
 <section id="{{.ID}}">
-  <h2>{{.Title}}</h2>
+  <h3>{{.Title}}</h3>
+  <p>{{.Description}}</p>
+  <details><summary>SQL</summary><pre>{{.SQL}}</pre></details>
+  {{if .Skipped}}<p><a href="?run={{.ID}}#{{.ID}}">Run this query</a> <span class="note">(expensive)</span></p>{{end}}
+  {{template "result" .}}
+</section>
+{{end}}
+
+<h2>Parameterized queries</h2>
+<p class="note">Fill in the inputs and press Run.</p>
+<form method="get">
+{{range .Parameterized}}
+<section id="{{.ID}}">
+  <h3>{{.Title}}</h3>
   <p>{{.Description}}</p>
   <p>
   {{$id := .ID}}{{$vals := .Values}}
@@ -32,16 +60,7 @@
   <button type="submit" formaction="#{{.ID}}">Run</button>
   </p>
   <details><summary>SQL</summary><pre>{{.SQL}}</pre></details>
-  {{if .Err}}<p class="err">{{.Err}}</p>
-  {{else if .Ran}}
-    {{if .Rows}}
-    <table>
-      <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
-      {{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
-    </table>
-    {{if .Truncated}}<p class="note">Truncated to the first {{$.Limit}} rows.</p>{{end}}
-    {{else}}<p class="note">No rows.</p>{{end}}
-  {{end}}
+  {{template "result" .}}
 </section>
 {{end}}
 </form>

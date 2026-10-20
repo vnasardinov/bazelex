@@ -83,29 +83,46 @@ type queryView struct {
 	Columns   []string
 	Rows      [][]string
 	Truncated bool
+	Limit     int
+	// Skipped is set for an expensive query that wasn't requested.
+	Skipped bool
 }
 
 type pageData struct {
-	DB      string
-	Limit   int
-	Labels  []string
-	Queries []queryView
+	DB     string
+	Limit  int
+	Labels []string
+	// SelfContained queries need no input; Parameterized ones do.
+	SelfContained []queryView
+	Parameterized []queryView
 }
 
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	page := pageData{DB: s.dbName, Limit: rowLimit, Labels: s.ruleLabels(r.Context())}
+	requested := map[string]bool{}
+	for _, id := range r.URL.Query()["run"] {
+		requested[id] = true
+	}
 	for _, q := range queries {
-		v := queryView{Query: q, Values: map[string]string{}}
+		v := queryView{Query: q, Values: map[string]string{}, Limit: rowLimit}
 		complete := true
 		for _, p := range q.Params {
 			val := strings.TrimSpace(r.URL.Query().Get(q.ID + "." + p.Name))
 			v.Values[p.Name] = val
 			complete = complete && val != ""
 		}
-		if complete {
+		switch {
+		case !complete:
+		case q.Expensive && !requested[q.ID]:
+			v.Skipped = true
+		default:
 			s.run(r.Context(), &v)
 		}
-		page.Queries = append(page.Queries, v)
+		if q.selfContained() {
+			page.SelfContained = append(page.SelfContained, v)
+		} else {
+			page.Parameterized = append(page.Parameterized, v)
+		}
 	}
 	if err := indexTmpl.Execute(w, page); err != nil {
 		log.Printf("render: %v", err)

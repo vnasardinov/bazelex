@@ -71,9 +71,14 @@ on a cold Bazel server.
 ## Web UI
 
 `bazelex_ui` serves a single page that runs the [example queries](#example-queries)
-which take a target label, and shows the first 20 rows of each result. It
-currently has transitive dependencies, impact of changing a target, and the
-shortest dependency path between two targets.
+and shows the first 20 rows of each result. The page has two sections:
+
+* Self-contained queries need no input: most depended-on targets, depth of
+  every rule, and heaviest targets. The first two run when the page loads.
+  Heaviest targets is expensive, so it only runs when you click its "Run this
+  query" link.
+* Parameterized queries need a target label: transitive dependencies, impact of
+  changing a target, and the shortest dependency path between two targets.
 
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite
@@ -85,7 +90,7 @@ Then open <http://localhost:6060>. Notes:
   against the directory you ran the command from. `--http` defaults to `:6060`.
 * The `--` before the flags is required. Without it Bazel tries to parse them
   as its own options.
-* Fill in the inputs of a query and press Run. The inputs autocomplete from the
+* For a parameterized query, fill in its inputs and press Run. The inputs autocomplete from the
   rule labels in the database, and their values are kept in the URL.
 * The database is opened read-only, and each query is limited to 10 seconds,
   because the recursive queries can be slow on large graphs.

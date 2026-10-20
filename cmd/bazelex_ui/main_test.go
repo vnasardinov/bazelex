@@ -55,8 +55,8 @@ func TestIndexWithoutParams(t *testing.T) {
 			t.Errorf("missing %q", q.Title)
 		}
 	}
-	if strings.Contains(body, "<table>") {
-		t.Error("no query should run without parameters")
+	if strings.Contains(body, "<th>path</th>") || strings.Contains(body, "No rows") {
+		t.Error("no parameterized query should run without parameters")
 	}
 }
 
@@ -71,5 +71,25 @@ func TestQueriesRun(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q in:\n%s", want, body)
 		}
+	}
+}
+
+func TestSelfContainedQueries(t *testing.T) {
+	path := testDB(t)
+	body := get(t, path, "/")
+	// Cheap queries run on load.
+	if !strings.Contains(body, "<td>//p:b</td><td>1</td>") {
+		t.Errorf("most-depended-on missing:\n%s", body)
+	}
+	if !strings.Contains(body, "<td>//p:c</td><td>2</td>") {
+		t.Errorf("rule-depth missing:\n%s", body)
+	}
+	// The expensive one waits to be asked for.
+	if !strings.Contains(body, "?run=heaviest") || strings.Contains(body, "<th>transitive_deps</th>") {
+		t.Error("heaviest should be offered, not run")
+	}
+	body = get(t, path, "/?run=heaviest")
+	if !strings.Contains(body, "<td>//p:a</td><td>2</td>") {
+		t.Errorf("heaviest missing:\n%s", body)
 	}
 }
