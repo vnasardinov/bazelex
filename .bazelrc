@@ -1,0 +1,3 @@
+# Load from the local configuration file, if it exists. This needs to be the
+# *last* statement in this file.
+try-import %workspace%/.bazelrc.user

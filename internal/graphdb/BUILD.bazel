@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "graphdb",
+    srcs = [
+        "load.go",
+        "schema.go",
+    ],
+    importpath = "github.com/vnasardinov/bazelex/internal/graphdb",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/buildproto",
+        "@org_golang_google_protobuf//encoding/protodelim",
+    ],
+)
+
+go_test(
+    name = "graphdb_test",
+    srcs = ["load_test.go"],
+    embed = [":graphdb"],
+    deps = [
+        "//internal/buildproto",
+        "@org_golang_google_protobuf//encoding/protodelim",
+        "@org_golang_google_protobuf//proto",
+        "@org_modernc_sqlite//:sqlite",
+    ],
+)
