@@ -3,14 +3,70 @@
 Dumps the static target graph reported by `bazel query` into a SQLite database,
 so it can be explored with SQL (for example with the `sqlite3` CLI).
 
-```sh
-bazel run //cmd/bazelex -- -db /tmp/graph.sqlite            # //...:all-targets
-bazel run //cmd/bazelex -- -db /tmp/graph.sqlite //foo/...  # explicit patterns
-bazel query --output=streamed_proto //... | bazelex -stdin
-```
+See [Building](#building) and [Running on a Bazel project](#running-on-a-bazel-project)
+below.
 
 Targets in external repositories are not loaded. Edges that point to them keep
 their `to_label` but have a NULL `to_id`.
+
+## Building
+
+You need [Bazelisk](https://github.com/bazelbuild/bazelisk) (or Bazel at the
+version in `.bazelversion`). The Go toolchain is managed by Bazel, so you don't
+need a local Go installation.
+
+```sh
+git clone https://github.com/vnasardinov/bazelex
+cd bazelex
+bazel build -c opt //cmd/bazelex
+```
+
+The binary is `bazel-bin/cmd/bazelex/bazelex_/bazelex`. To put it on your
+`PATH`:
+
+```sh
+install -m 755 bazel-bin/cmd/bazelex/bazelex_/bazelex ~/.local/bin/bazelex
+```
+
+## Running on a Bazel project
+
+`cd` into any directory inside the Bazel workspace you want to analyze and run
+the binary there:
+
+```sh
+cd /path/to/your/project
+/path/to/bazelex/bazel-bin/cmd/bazelex/bazelex_/bazelex --db graph.sqlite
+```
+
+(or just `bazelex --db graph.sqlite` if it is on your `PATH`). It prints
+`loaded N targets into graph.sqlite` when it is done. Then explore the result:
+
+```sh
+sqlite3 graph.sqlite
+```
+
+Notes:
+
+* `bazel` must be on your `PATH` (use `--bazel` to name a different binary), and
+  the project must be able to load with `bazel query`. The first run may start a
+  Bazel server and fetch external repositories.
+* A relative `--db` path is created in the current directory. An existing file
+  is replaced.
+* By default it queries `//...:all-targets`. Pass target patterns as arguments
+  to narrow it, for example `bazelex --db graph.sqlite //foo/...:all-targets`.
+  Patterns are used as given, so without the `:all-targets` suffix you get rules
+  only, and edges to source files stay unresolved.
+* To reuse an existing query result instead, run
+  `bazel query --output=streamed_proto //...:all-targets | bazelex -stdin`.
+* `bazel run //cmd/bazelex` only works against bazelex's own workspace, because
+  `bazel run` is always tied to the workspace it is invoked from. To analyze
+  another project, use the built binary as shown above.
+* Add the database file to that project's `.gitignore`, or write it outside the
+  working tree, so it isn't committed by accident.
+
+Example: running it over the [buildtools](https://github.com/bazel-contrib/buildtools)
+repository with `--db buildtools.sqlite` loaded 545 targets in about 5 seconds
+on a cold Bazel server.
 
 ## Layout
 
