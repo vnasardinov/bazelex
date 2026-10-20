@@ -16,7 +16,17 @@ type Query struct {
 	Params      []Param // none for a self-contained query
 	// Expensive queries are not run on page load; the user asks for them.
 	Expensive bool
-	SQL       string
+	// RowLink, if set, turns a column of the results into links to another query.
+	RowLink *RowLink
+	SQL     string
+}
+
+// RowLink makes each value in Column a link that opens the query ToQuery with
+// its parameter ToParam set to that value.
+type RowLink struct {
+	Column  string
+	ToQuery string
+	ToParam string
 }
 
 // selfContained reports whether the query needs no user input.
@@ -36,6 +46,7 @@ GROUP BY t.label ORDER BY n DESC;`,
 		ID:          "rule-depth",
 		Title:       "Depth of every rule",
 		Description: "The longest dependency chain from any top-level rule down to each rule. The largest value is the length of the longest chain in the graph; if it equals the depth limit (100), the graph probably has a cycle.",
+		RowLink:     &RowLink{Column: "label", ToQuery: "longest-chain", ToParam: "target"},
 		SQL: `WITH RECURSIVE
   dep(f, t) AS (
     SELECT DISTINCT e.from_id, e.to_id FROM edge e
@@ -128,5 +139,42 @@ ORDER BY t.label;`,
 SELECT depth, path FROM walk JOIN target t ON t.id = walk.id
 WHERE t.label = :to
 ORDER BY depth LIMIT 1;`,
+	},
+	{
+		ID:          "longest-chain",
+		Title:       "Longest dependency chain to a target",
+		Description: "The chain of deps/embed edges, from a top-level rule down to the target, whose length is the target's depth in \"Depth of every rule\". Several chains can tie for the longest; this shows one of them.",
+		Params:      []Param{{"target", "Target", "//foo:bar"}},
+		SQL: `WITH RECURSIVE
+  dep(f, t) AS (
+    SELECT DISTINCT e.from_id, e.to_id FROM edge e
+    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
+    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
+    WHERE e.attr IN ('deps', 'embed')
+  ),
+  roots(id) AS (SELECT f FROM dep EXCEPT SELECT t FROM dep),
+  walk(id, depth) AS (
+    SELECT id, 0 FROM roots
+    UNION
+    SELECT dep.t, walk.depth + 1 FROM dep JOIN walk ON dep.f = walk.id
+    WHERE walk.depth < 100
+  ),
+  depth(id, depth) AS (SELECT id, MAX(depth) FROM walk GROUP BY id),
+  -- One parent per rule, one level shallower: following these from the target
+  -- gives a single longest chain.
+  parent(id, p) AS (
+    SELECT dep.t, MIN(dep.f) FROM dep
+    JOIN depth df ON df.id = dep.f
+    JOIN depth dt ON dt.id = dep.t AND df.depth = dt.depth - 1
+    GROUP BY dep.t
+  ),
+  up(id, depth, len, path) AS (
+    SELECT depth.id, depth.depth, depth.depth, t.label
+    FROM depth JOIN target t ON t.id = depth.id WHERE t.label = :target
+    UNION ALL
+    SELECT parent.p, up.depth - 1, up.len, t.label || ' -> ' || up.path
+    FROM up JOIN parent ON parent.id = up.id JOIN target t ON t.id = parent.p
+  )
+SELECT len AS depth, path FROM up WHERE depth = 0;`,
 	},
 }

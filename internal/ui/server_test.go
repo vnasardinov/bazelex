@@ -89,7 +89,8 @@ func TestSelfContainedQueries(t *testing.T) {
 	if !strings.Contains(body, "<td>//p:b</td><td>1</td>") {
 		t.Errorf("most-depended-on missing:\n%s", body)
 	}
-	if !strings.Contains(body, "<td>//p:c</td><td>2</td>") {
+	// The label links to the longest-chain query.
+	if !strings.Contains(body, `href="?longest-chain.target=%2F%2Fp%3Ac#longest-chain">//p:c</a></td><td>2</td>`) {
 		t.Errorf("rule-depth missing:\n%s", body)
 	}
 	// The expensive one waits to be asked for.
@@ -173,5 +174,34 @@ func TestRowsFlag(t *testing.T) {
 	body = getRows(t, testDB(t), url+"&transitive-deps.page=2", 2)
 	if !strings.Contains(body, "rows 3&ndash;3)") {
 		t.Errorf("page 2 wrong:\n%s", body)
+	}
+}
+
+func TestLongestChain(t *testing.T) {
+	path := testDB(t)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a -> b -> c as before, plus a shortcut a -> c and a second top-level
+	// rule x -> c. The longest chain to c is still a -> b -> c.
+	for _, q := range []string{
+		`INSERT INTO target(id,label,kind,package,name) VALUES (4,'//p:x','rule','p','x')`,
+		`INSERT INTO edge VALUES (1,'//p:c',3,'deps',0,0),(4,'//p:c',3,'deps',0,0)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	got := getRows(t, path, "/?longest-chain.target=//p:c", 20)
+	if !strings.Contains(got, "<td>2</td><td>//p:a -&gt; //p:b -&gt; //p:c</td>") {
+		t.Errorf("chain wrong:\n%s", got)
+	}
+	// A top-level rule is its own chain, of length 0.
+	got = getRows(t, path, "/?longest-chain.target=//p:x", 20)
+	if !strings.Contains(got, "<td>0</td><td>//p:x</td>") {
+		t.Errorf("root chain wrong:\n%s", got)
 	}
 }

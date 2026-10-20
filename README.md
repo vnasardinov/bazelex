@@ -77,9 +77,14 @@ links for longer results. The page has two sections:
 * Self-contained queries need no input: most depended-on targets, depth of
   every rule, and heaviest targets. The first two run when the page loads.
   Heaviest targets is expensive, so it only runs when you click its "Run this
-  query" link.
+  query" link. Each label in the depth results links to the longest dependency
+  chain to that rule.
 * Parameterized queries need a target label: transitive dependencies, impact of
-  changing a target, and the shortest dependency path between two targets.
+  changing a target, the shortest dependency path between two targets, and the
+  longest dependency chain to a target. The longest chain is the one whose
+  length is the target's depth in "Depth of every rule", from a top-level rule
+  down to the target. Ties are broken the same way every time, so only one
+  chain is shown.
 
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite

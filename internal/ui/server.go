@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,12 @@ func NewServer(db *sql.DB, dbName string, pageRows int) http.Handler {
 	return mux
 }
 
+// cell is one value in a result row. URL is set when it should be a link.
+type cell struct {
+	Text string
+	URL  string
+}
+
 // queryView is what the template renders for one query.
 type queryView struct {
 	Query
@@ -48,7 +55,7 @@ type queryView struct {
 	Ran     bool
 	Err     string
 	Columns []string
-	Rows    [][]string
+	Rows    [][]cell
 	Limit   int
 	// Page is the 1-based page of results shown. PrevURL and NextURL are empty
 	// when there is no such page.
@@ -93,6 +100,7 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 			v.Skipped = true
 		default:
 			hasNext := s.run(r.Context(), &v)
+			v.addRowLinks(r.URL.Query())
 			v.FirstRow = (v.Page-1)*s.pageRows + 1
 			v.LastRow = v.FirstRow + len(v.Rows) - 1
 			if v.Page > 1 {
@@ -111,6 +119,32 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	if err := indexTmpl.Execute(w, page); err != nil {
 		log.Printf("render: %v", err)
 	}
+}
+
+// addRowLinks turns the values of v's RowLink column into links.
+func (v *queryView) addRowLinks(params url.Values) {
+	if v.RowLink == nil {
+		return
+	}
+	col := slices.Index(v.Columns, v.RowLink.Column)
+	if col < 0 {
+		return
+	}
+	for _, row := range v.Rows {
+		row[col].URL = linkURL(params, v.RowLink.ToQuery, v.RowLink.ToParam, row[col].Text)
+	}
+}
+
+// linkURL returns a link that opens query id with its parameter set to value,
+// at its first page, keeping the rest of the current URL's parameters.
+func linkURL(params url.Values, id, param, value string) string {
+	p := url.Values{}
+	for k, vs := range params {
+		p[k] = vs
+	}
+	p.Set(id+"."+param, value)
+	p.Del(id + ".page")
+	return "?" + p.Encode() + "#" + id
 }
 
 // pageURL returns a link to the given page of query id that keeps the rest of
@@ -167,15 +201,15 @@ func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
 			v.Err = err.Error()
 			return
 		}
-		row := make([]string, len(vals))
+		row := make([]cell, len(vals))
 		for i, x := range vals {
 			switch x := x.(type) {
 			case nil:
-				row[i] = "NULL"
+				row[i].Text = "NULL"
 			case []byte:
-				row[i] = string(x)
+				row[i].Text = string(x)
 			default:
-				row[i] = fmt.Sprint(x)
+				row[i].Text = fmt.Sprint(x)
 			}
 		}
 		v.Rows = append(v.Rows, row)
