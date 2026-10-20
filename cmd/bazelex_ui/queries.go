@@ -30,7 +30,7 @@ var queries = []Query{
 		SQL: `SELECT t.label, COUNT(*) AS n
 FROM edge e JOIN target t ON t.id = e.to_id
 WHERE e.attr = 'deps'
-GROUP BY t.label ORDER BY n DESC LIMIT 10;`,
+GROUP BY t.label ORDER BY n DESC;`,
 	},
 	{
 		ID:          "rule-depth",
@@ -52,7 +52,7 @@ GROUP BY t.label ORDER BY n DESC LIMIT 10;`,
   )
 SELECT t.label, MAX(walk.depth) AS depth
 FROM walk JOIN target t ON t.id = walk.id
-GROUP BY t.label ORDER BY depth DESC LIMIT 10;`,
+GROUP BY t.label ORDER BY depth DESC;`,
 	},
 	{
 		ID:          "heaviest",
@@ -73,7 +73,7 @@ GROUP BY t.label ORDER BY depth DESC LIMIT 10;`,
   )
 SELECT t.label, COUNT(*) - 1 AS transitive_deps
 FROM closure JOIN target t ON t.id = closure.root
-GROUP BY t.label ORDER BY transitive_deps DESC LIMIT 10;`,
+GROUP BY t.label ORDER BY transitive_deps DESC;`,
 	},
 	{
 		ID:          "transitive-deps",
