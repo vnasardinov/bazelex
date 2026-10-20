@@ -162,3 +162,103 @@ WITH RECURSIVE r(id) AS (
 )
 SELECT t.label FROM r JOIN target t ON t.id = r.id;
 ```
+
+### More recursive queries
+
+These all use the same building block: rule-to-rule dependency edges, with
+`attr` limited to `deps` and `embed`. Include `data` as well if you care about
+runtime dependencies, and leave `visibility` and the implicit `$...`/`:...`
+attributes out. Cycles can't make these run forever: the queries that track
+depth or paths have a depth limit, and the others use `UNION`, which drops
+duplicate rows.
+
+Direct and transitive impact of changing a target, that is everything that
+(transitively) depends on it:
+
+```sql
+WITH RECURSIVE r(id) AS (
+  SELECT id FROM target WHERE label = '//foo:bar'
+  UNION
+  SELECT e.from_id FROM edge e JOIN r ON e.to_id = r.id
+  WHERE e.attr IN ('deps', 'embed')
+)
+SELECT t.label FROM r JOIN target t ON t.id = r.id
+WHERE t.kind = 'rule' AND t.label <> '//foo:bar'
+ORDER BY t.label;
+```
+
+Shortest dependency path from one target to another:
+
+```sql
+WITH RECURSIVE
+  dep(f, t) AS (
+    SELECT DISTINCT from_id, to_id FROM edge
+    WHERE attr IN ('deps', 'embed') AND to_id IS NOT NULL
+  ),
+  walk(id, depth, path) AS (
+    SELECT id, 0, label FROM target WHERE label = '//foo:bar'
+    UNION ALL
+    SELECT dep.t, walk.depth + 1, walk.path || ' -> ' || t.label
+    FROM dep
+    JOIN walk ON dep.f = walk.id
+    JOIN target t ON t.id = dep.t
+    WHERE walk.depth < 20
+  )
+SELECT depth, path FROM walk JOIN target t ON t.id = walk.id
+WHERE t.label = '//baz:qux'
+ORDER BY depth LIMIT 1;
+```
+
+This enumerates every path from the start target up to the depth limit, so it
+can be slow from a target near the top of a large, wide graph. Lower the limit
+if it is.
+
+Depth of every rule: the length of the longest dependency chain from any
+top-level rule (one that nothing depends on) down to it. The largest value is
+the length of the longest chain in the whole graph:
+
+```sql
+WITH RECURSIVE
+  dep(f, t) AS (
+    SELECT DISTINCT e.from_id, e.to_id FROM edge e
+    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
+    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
+    WHERE e.attr IN ('deps', 'embed')
+  ),
+  roots(id) AS (SELECT f FROM dep EXCEPT SELECT t FROM dep),
+  walk(id, depth) AS (
+    SELECT id, 0 FROM roots
+    UNION
+    SELECT dep.t, walk.depth + 1 FROM dep JOIN walk ON dep.f = walk.id
+    WHERE walk.depth < 100
+  )
+SELECT t.label, MAX(walk.depth) AS depth
+FROM walk JOIN target t ON t.id = walk.id
+GROUP BY t.label ORDER BY depth DESC LIMIT 10;
+```
+
+This tracks `(target, depth)` pairs instead of whole paths, so it stays small
+even when the number of distinct paths is huge. If the top depth equals the
+limit, the graph probably has a cycle among these edges.
+
+Heaviest targets: how many rules each one pulls in transitively. This is the
+"how much does building this cost" number, and it is the most expensive query
+here, because it computes the full closure from every rule:
+
+```sql
+WITH RECURSIVE
+  dep(f, t) AS (
+    SELECT DISTINCT e.from_id, e.to_id FROM edge e
+    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
+    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
+    WHERE e.attr IN ('deps', 'embed')
+  ),
+  closure(root, id) AS (
+    SELECT id, id FROM target WHERE kind = 'rule'
+    UNION
+    SELECT closure.root, dep.t FROM dep JOIN closure ON dep.f = closure.id
+  )
+SELECT t.label, COUNT(*) - 1 AS transitive_deps
+FROM closure JOIN target t ON t.id = closure.root
+GROUP BY t.label ORDER BY transitive_deps DESC LIMIT 10;
+```
