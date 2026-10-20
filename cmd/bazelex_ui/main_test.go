@@ -36,13 +36,18 @@ func testDB(t *testing.T) string {
 
 func get(t *testing.T, path, url string) string {
 	t.Helper()
+	return getRows(t, path, url, 20)
+}
+
+func getRows(t *testing.T, path, url string, rows int) string {
+	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	newServer(db, "g.sqlite").ServeHTTP(w, httptest.NewRequest("GET", url, nil))
+	newServer(db, "g.sqlite", rows).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
 	if w.Code != 200 {
 		t.Fatalf("status %d", w.Code)
 	}
@@ -153,5 +158,18 @@ func TestPagination(t *testing.T) {
 	body = card(t, path, base+"&transitive-deps.page=9")
 	if !strings.Contains(body, "No rows") || !strings.Contains(body, "Previous") {
 		t.Errorf("empty page wrong:\n%s", body)
+	}
+}
+
+func TestRowsFlag(t *testing.T) {
+	// transitive-deps of //p:a is {//p:a, //p:b, //p:c}: three rows.
+	url := "/?transitive-deps.target=//p:a"
+	body := getRows(t, testDB(t), url, 2)
+	if !strings.Contains(body, "rows 1&ndash;2)") || !strings.Contains(body, "transitive-deps.page=2") {
+		t.Errorf("2 rows per page not honored:\n%s", body)
+	}
+	body = getRows(t, testDB(t), url+"&transitive-deps.page=2", 2)
+	if !strings.Contains(body, "rows 3&ndash;3)") {
+		t.Errorf("page 2 wrong:\n%s", body)
 	}
 }

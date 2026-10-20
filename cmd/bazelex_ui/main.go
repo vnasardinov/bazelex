@@ -23,10 +23,10 @@ import (
 var (
 	httpAddr = flag.String("http", ":6060", "address to listen on")
 	dbPath   = flag.String("db", "bazelex.sqlite", "SQLite database written by bazelex")
+	pageRows = flag.Int("rows", 20, "maximum number of result rows to show at once; longer results are paginated")
 )
 
 const (
-	rowLimit     = 20
 	queryTimeout = 10 * time.Second
 	maxLabels    = 20000
 )
@@ -46,6 +46,9 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	if *pageRows < 1 {
+		log.Fatalf("-rows must be at least 1, got %d", *pageRows)
+	}
 	if _, err := os.Stat(*dbPath); err != nil {
 		log.Fatal(err)
 	}
@@ -61,16 +64,17 @@ func main() {
 	}
 
 	log.Printf("serving %s on %s", *dbPath, *httpAddr)
-	log.Fatal(http.ListenAndServe(*httpAddr, newServer(db, *dbPath)))
+	log.Fatal(http.ListenAndServe(*httpAddr, newServer(db, *dbPath, *pageRows)))
 }
 
 type server struct {
-	db     *sql.DB
-	dbName string
+	db       *sql.DB
+	dbName   string
+	pageRows int // rows shown per page
 }
 
-func newServer(db *sql.DB, dbName string) http.Handler {
-	s := &server{db: db, dbName: dbName}
+func newServer(db *sql.DB, dbName string, pageRows int) http.Handler {
+	s := &server{db: db, dbName: dbName, pageRows: pageRows}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	return mux
@@ -106,13 +110,13 @@ type pageData struct {
 }
 
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
-	page := pageData{DB: s.dbName, Limit: rowLimit, Labels: s.ruleLabels(r.Context())}
+	page := pageData{DB: s.dbName, Limit: s.pageRows, Labels: s.ruleLabels(r.Context())}
 	requested := map[string]bool{}
 	for _, id := range r.URL.Query()["run"] {
 		requested[id] = true
 	}
 	for _, q := range queries {
-		v := queryView{Query: q, Values: map[string]string{}, Limit: rowLimit, Page: 1}
+		v := queryView{Query: q, Values: map[string]string{}, Limit: s.pageRows, Page: 1}
 		if n, err := strconv.Atoi(r.URL.Query().Get(q.ID + ".page")); err == nil && n > 1 {
 			v.Page = n
 		}
@@ -128,7 +132,7 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 			v.Skipped = true
 		default:
 			hasNext := s.run(r.Context(), &v)
-			v.FirstRow = (v.Page-1)*rowLimit + 1
+			v.FirstRow = (v.Page-1)*s.pageRows + 1
 			v.LastRow = v.FirstRow + len(v.Rows) - 1
 			if v.Page > 1 {
 				v.PrevURL = pageURL(r.URL.Query(), q.ID, v.Page-1)
@@ -184,13 +188,13 @@ func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
 		v.Err = err.Error()
 		return
 	}
-	skip := (v.Page - 1) * rowLimit
+	skip := (v.Page - 1) * s.pageRows
 	for rows.Next() {
 		if skip > 0 {
 			skip--
 			continue
 		}
-		if len(v.Rows) == rowLimit {
+		if len(v.Rows) == s.pageRows {
 			return true
 		}
 		vals := make([]any, len(v.Columns))

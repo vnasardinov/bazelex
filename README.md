@@ -71,8 +71,8 @@ on a cold Bazel server.
 ## Web UI
 
 `bazelex_ui` serves a single page that runs the [example queries](#example-queries)
-and shows the results 20 rows at a time, with Previous and Next links for longer
-results. The page has two sections:
+and shows the results 20 rows at a time (see `--rows`), with Previous and Next
+links for longer results. The page has two sections:
 
 * Self-contained queries need no input: most depended-on targets, depth of
   every rule, and heaviest targets. The first two run when the page loads.
@@ -89,6 +89,7 @@ Then open <http://localhost:6060>. Notes:
 
 * `--db` is a database written by `bazelex`. A relative path is resolved
   against the directory you ran the command from. `--http` defaults to `:6060`.
+  `--rows` sets how many result rows are shown at once (default 20).
 * The `--` before the flags is required. Without it Bazel tries to parse them
   as its own options.
 * For a parameterized query, fill in its inputs and press Run. The inputs autocomplete from the
