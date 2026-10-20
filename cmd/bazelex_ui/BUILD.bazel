@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "bazelex_ui_lib",
+    srcs = [
+        "main.go",
+        "queries.go",
+    ],
+    embedsrcs = ["index.html"],
+    importpath = "github.com/vnasardinov/bazelex/cmd/bazelex_ui",
+    visibility = ["//visibility:private"],
+    deps = ["@org_modernc_sqlite//:sqlite"],
+)
+
+go_binary(
+    name = "bazelex_ui",
+    embed = [":bazelex_ui_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "bazelex_ui_test",
+    srcs = ["main_test.go"],
+    embed = [":bazelex_ui_lib"],
+    deps = ["//internal/graphdb"],
+)

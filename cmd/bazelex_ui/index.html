@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bazelex</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; max-width: 70em; margin: 2em auto; padding: 0 1em; }
+  section { border: 1px solid #ccc; border-radius: 6px; padding: 0 1em 1em; margin-bottom: 1.5em; }
+  label { margin-right: 1em; }
+  input[type=text] { width: 22em; font-family: monospace; }
+  table { border-collapse: collapse; margin-top: 1em; }
+  th, td { border: 1px solid #ddd; padding: 2px 8px; text-align: left; font-family: monospace; }
+  th { background: #f4f4f4; }
+  .err { color: #b00; white-space: pre-wrap; }
+  .note { color: #666; }
+  pre { background: #f8f8f8; padding: .5em; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>bazelex</h1>
+<p class="note">Database: <code>{{.DB}}</code>. Results are limited to {{.Limit}} rows.</p>
+<datalist id="labels">{{range .Labels}}<option value="{{.}}">{{end}}</datalist>
+<form method="get">
+{{range .Queries}}
+<section id="{{.ID}}">
+  <h2>{{.Title}}</h2>
+  <p>{{.Description}}</p>
+  <p>
+  {{$id := .ID}}{{$vals := .Values}}
+  {{range .Params}}<label>{{.Label}}
+    <input type="text" list="labels" name="{{$id}}.{{.Name}}" placeholder="{{.Placeholder}}" value="{{index $vals .Name}}"></label>{{end}}
+  <button type="submit" formaction="#{{.ID}}">Run</button>
+  </p>
+  <details><summary>SQL</summary><pre>{{.SQL}}</pre></details>
+  {{if .Err}}<p class="err">{{.Err}}</p>
+  {{else if .Ran}}
+    {{if .Rows}}
+    <table>
+      <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
+      {{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
+    </table>
+    {{if .Truncated}}<p class="note">Truncated to the first {{$.Limit}} rows.</p>{{end}}
+    {{else}}<p class="note">No rows.</p>{{end}}
+  {{end}}
+</section>
+{{end}}
+</form>
+</body>
+</html>
