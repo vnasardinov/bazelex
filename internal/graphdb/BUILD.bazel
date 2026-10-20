@@ -9,7 +9,7 @@ go_library(
     importpath = "github.com/vnasardinov/bazelex/internal/graphdb",
     visibility = ["//:__subpackages__"],
     deps = [
-        "//internal/buildproto",
+        "@com_github_bazel_contrib_buildtools_v10//build_proto",
         "@org_golang_google_protobuf//encoding/protodelim",
     ],
 )
@@ -19,7 +19,7 @@ go_test(
     srcs = ["load_test.go"],
     embed = [":graphdb"],
     deps = [
-        "//internal/buildproto",
+        "@com_github_bazel_contrib_buildtools_v10//build_proto",
         "@org_golang_google_protobuf//encoding/protodelim",
         "@org_golang_google_protobuf//proto",
         "@org_modernc_sqlite//:sqlite",

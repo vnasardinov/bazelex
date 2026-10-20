@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	bpb "github.com/vnasardinov/bazelex/internal/buildproto"
+	bpb "github.com/bazel-contrib/buildtools/v10/build_proto"
 )
 
 const (

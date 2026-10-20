@@ -1,7 +1,5 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
-# internal/buildproto/build.gen.pb.go is checked in and compiled as plain Go.
-# gazelle:proto disable
 # gazelle:prefix github.com/vnasardinov/bazelex
 
 gazelle(name = "gazelle")

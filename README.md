@@ -73,11 +73,11 @@ on a cold Bazel server.
 * `cmd/bazelex/`: the command-line entry point (flags, running `bazel query`).
 * `internal/graphdb/`: the SQLite schema and the loader that turns a stream of
   query `Target` messages into rows. This is where the tests live.
-* `internal/buildproto/`: Bazel's `build.proto` and its checked-in Go bindings,
-  vendored from [buildtools](https://github.com/bazel-contrib/buildtools)
-  because the module that provides it is not importable from here. The proto is
-  copied from Bazel itself, so regenerate the bindings from a newer
-  `build.proto` if a Bazel upgrade needs new fields.
+* Bazel's query proto bindings (`build_proto`) come from the published
+  [buildtools](https://github.com/bazel-contrib/buildtools) module
+  (`github.com/bazel-contrib/buildtools/v10`). `MODULE.bazel` overrides how
+  gazelle builds that module so it uses the checked-in `build.gen.pb.go` as plain
+  Go instead of compiling protoc from source.
 
 ## Development
 
