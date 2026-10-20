@@ -11,7 +11,9 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,13 +79,19 @@ func newServer(db *sql.DB, dbName string) http.Handler {
 // queryView is what the template renders for one query.
 type queryView struct {
 	Query
-	Values    map[string]string // current input values, by param name
-	Ran       bool
-	Err       string
-	Columns   []string
-	Rows      [][]string
-	Truncated bool
-	Limit     int
+	Values  map[string]string // current input values, by param name
+	Ran     bool
+	Err     string
+	Columns []string
+	Rows    [][]string
+	Limit   int
+	// Page is the 1-based page of results shown. PrevURL and NextURL are empty
+	// when there is no such page.
+	Page     int
+	FirstRow int // 1-based numbers of the first and last rows shown
+	LastRow  int
+	PrevURL  string
+	NextURL  string
 	// Skipped is set for an expensive query that wasn't requested.
 	Skipped bool
 }
@@ -104,7 +112,10 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		requested[id] = true
 	}
 	for _, q := range queries {
-		v := queryView{Query: q, Values: map[string]string{}, Limit: rowLimit}
+		v := queryView{Query: q, Values: map[string]string{}, Limit: rowLimit, Page: 1}
+		if n, err := strconv.Atoi(r.URL.Query().Get(q.ID + ".page")); err == nil && n > 1 {
+			v.Page = n
+		}
 		complete := true
 		for _, p := range q.Params {
 			val := strings.TrimSpace(r.URL.Query().Get(q.ID + "." + p.Name))
@@ -116,7 +127,15 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		case q.Expensive && !requested[q.ID]:
 			v.Skipped = true
 		default:
-			s.run(r.Context(), &v)
+			hasNext := s.run(r.Context(), &v)
+			v.FirstRow = (v.Page-1)*rowLimit + 1
+			v.LastRow = v.FirstRow + len(v.Rows) - 1
+			if v.Page > 1 {
+				v.PrevURL = pageURL(r.URL.Query(), q.ID, v.Page-1)
+			}
+			if hasNext {
+				v.NextURL = pageURL(r.URL.Query(), q.ID, v.Page+1)
+			}
 		}
 		if q.selfContained() {
 			page.SelfContained = append(page.SelfContained, v)
@@ -129,8 +148,24 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// run executes v's query and fills in the result fields.
-func (s *server) run(ctx context.Context, v *queryView) {
+// pageURL returns a link to the given page of query id that keeps the rest of
+// the current URL's parameters.
+func pageURL(params url.Values, id string, page int) string {
+	p := url.Values{}
+	for k, vs := range params {
+		p[k] = vs
+	}
+	if page > 1 {
+		p.Set(id+".page", strconv.Itoa(page))
+	} else {
+		p.Del(id + ".page")
+	}
+	return "?" + p.Encode() + "#" + id
+}
+
+// run executes v's query and fills in the result fields with the rows of page
+// v.Page. It reports whether there are more rows after that page.
+func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
 	v.Ran = true
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -149,10 +184,14 @@ func (s *server) run(ctx context.Context, v *queryView) {
 		v.Err = err.Error()
 		return
 	}
+	skip := (v.Page - 1) * rowLimit
 	for rows.Next() {
+		if skip > 0 {
+			skip--
+			continue
+		}
 		if len(v.Rows) == rowLimit {
-			v.Truncated = true
-			return
+			return true
 		}
 		vals := make([]any, len(v.Columns))
 		ptrs := make([]any, len(vals))
@@ -179,6 +218,7 @@ func (s *server) run(ctx context.Context, v *queryView) {
 	if err := rows.Err(); err != nil {
 		v.Err = err.Error()
 	}
+	return false
 }
 
 // ruleLabels returns rule labels for input autocompletion. Failure only costs

@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
@@ -91,5 +92,66 @@ func TestSelfContainedQueries(t *testing.T) {
 	body = get(t, path, "/?run=heaviest")
 	if !strings.Contains(body, "<td>//p:a</td><td>2</td>") {
 		t.Errorf("heaviest missing:\n%s", body)
+	}
+}
+
+// card fetches url and returns the transitive-deps card of the page.
+func card(t *testing.T, path, url string) string {
+	t.Helper()
+	body := get(t, path, url)
+	i := strings.Index(body, `id="transitive-deps"`)
+	j := strings.Index(body[i:], "</section>")
+	if i < 0 || j < 0 {
+		t.Fatalf("no transitive-deps card in:\n%s", body)
+	}
+	return body[i : i+j]
+}
+
+func TestPagination(t *testing.T) {
+	path := testDB(t)
+	// Add 45 rules, each depended on by //p:a, so "impact" of nothing is
+	// useless but "transitive-deps" of //p:a has 2+45 rows.
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 45; i++ {
+		label := fmt.Sprintf("//q:r%02d", i)
+		if _, err := db.Exec(`INSERT INTO target(id,label,kind,package,name) VALUES (?,?,'rule','q','x')`, 100+i, label); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO edge VALUES (1,?,?,'deps',0,0)`, label, 100+i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	// card returns the HTML of the transitive-deps card only; other cards
+	// paginate too, given this data.
+	base := "/?transitive-deps.target=//p:a&run=heaviest"
+	body := card(t, path, base)
+	if !strings.Contains(body, "Page 1 (rows 1&ndash;20)") || !strings.Contains(body, "Next") {
+		t.Errorf("page 1 wrong:\n%s", body)
+	}
+	if strings.Contains(body, "Previous") {
+		t.Error("page 1 should have no Previous link")
+	}
+	// Other parameters survive in the Next link.
+	if !strings.Contains(body, "run=heaviest") || !strings.Contains(body, "transitive-deps.page=2") {
+		t.Errorf("next link wrong:\n%s", body)
+	}
+
+	body = card(t, path, base+"&transitive-deps.page=3")
+	if !strings.Contains(body, "Page 3 (rows 41&ndash;48)") || !strings.Contains(body, "Previous") {
+		t.Errorf("last page wrong:\n%s", body)
+	}
+	if strings.Contains(body, "Next") {
+		t.Error("last page should have no Next link")
+	}
+
+	// Past the end: no rows, but a way back.
+	body = card(t, path, base+"&transitive-deps.page=9")
+	if !strings.Contains(body, "No rows") || !strings.Contains(body, "Previous") {
+		t.Errorf("empty page wrong:\n%s", body)
 	}
 }

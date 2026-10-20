@@ -71,7 +71,8 @@ on a cold Bazel server.
 ## Web UI
 
 `bazelex_ui` serves a single page that runs the [example queries](#example-queries)
-and shows the first 20 rows of each result. The page has two sections:
+and shows the results 20 rows at a time, with Previous and Next links for longer
+results. The page has two sections:
 
 * Self-contained queries need no input: most depended-on targets, depth of
   every rule, and heaviest targets. The first two run when the page loads.

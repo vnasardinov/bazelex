@@ -18,7 +18,7 @@
 </head>
 <body>
 <h1>bazelex</h1>
-<p class="note">Database: <code>{{.DB}}</code>. Results are limited to {{.Limit}} rows.</p>
+<p class="note">Database: <code>{{.DB}}</code>. Results are shown {{.Limit}} rows per page.</p>
 <datalist id="labels">{{range .Labels}}<option value="{{.}}">{{end}}</datalist>
 
 {{define "result"}}
@@ -29,8 +29,14 @@
       <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
       {{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
     </table>
-    {{if .Truncated}}<p class="note">Truncated to the first {{.Limit}} rows.</p>{{end}}
     {{else}}<p class="note">No rows.</p>{{end}}
+    {{if or .PrevURL .NextURL}}
+    <p class="note">
+      {{if .PrevURL}}<a href="{{.PrevURL}}">&larr; Previous</a>{{end}}
+      Page {{.Page}}{{if .Rows}} (rows {{.FirstRow}}&ndash;{{.LastRow}}){{end}}
+      {{if .NextURL}}<a href="{{.NextURL}}">Next &rarr;</a>{{end}}
+    </p>
+    {{end}}
   {{end}}
 {{end}}
 
