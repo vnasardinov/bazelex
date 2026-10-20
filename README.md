@@ -80,7 +80,7 @@ Plain `//...` in `query` returns only rules, so the default pattern is
 
 ## Schema
 
-See [`schema.go`](schema.go). Two tables: `target` (one row per rule, source
+See [`internal/graphdb/schema.go`](internal/graphdb/schema.go). Two tables: `target` (one row per rule, source
 file, generated file, ...) and `edge` (one row per dependency, tagged with the
 attribute it came from and whether it came from a `select()` branch).
 
