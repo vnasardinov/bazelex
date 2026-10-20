@@ -3,8 +3,8 @@
 Dumps the static target graph reported by `bazel query` into a SQLite database,
 so it can be explored with SQL (for example with the `sqlite3` CLI).
 
-See [Building](#building) and [Running on a Bazel project](#running-on-a-bazel-project)
-below.
+See [Building](#building), [Running on a Bazel project](#running-on-a-bazel-project)
+and [Web UI](#web-ui) below.
 
 Targets in external repositories are not loaded. Edges that point to them keep
 their `to_label` but have a NULL `to_id`.
@@ -68,9 +68,36 @@ Example: running it over the [buildtools](https://github.com/bazel-contrib/build
 repository with `--db buildtools.sqlite` loaded 545 targets in about 5 seconds
 on a cold Bazel server.
 
+## Web UI
+
+`bazelex_ui` serves a single page that runs the [example queries](#example-queries)
+which take a target label, and shows the first 20 rows of each result. It
+currently has transitive dependencies, impact of changing a target, and the
+shortest dependency path between two targets.
+
+```sh
+bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite
+```
+
+Then open <http://localhost:6060>. Notes:
+
+* `--db` is a database written by `bazelex`. A relative path is resolved
+  against the directory you ran the command from. `--http` defaults to `:6060`.
+* The `--` before the flags is required. Without it Bazel tries to parse them
+  as its own options.
+* Fill in the inputs of a query and press Run. The inputs autocomplete from the
+  rule labels in the database, and their values are kept in the URL.
+* The database is opened read-only, and each query is limited to 10 seconds,
+  because the recursive queries can be slow on large graphs.
+* The UI never runs Bazel, so it can serve a database of any project. Run it
+  from a bazelex checkout and point `--db` at the file, or use the built binary
+  (`bazel build //cmd/bazelex_ui`, then `bazel-bin/cmd/bazelex_ui/bazelex_ui_/bazelex_ui`).
+* The page is plain HTML rendered by Go templates, with no JavaScript.
+
 ## Layout
 
 * `cmd/bazelex/`: the command-line entry point (flags, running `bazel query`).
+* `cmd/bazelex_ui/`: the web UI for the example queries.
 * `internal/graphdb/`: the SQLite schema and the loader that turns a stream of
   query `Target` messages into rows. This is where the tests live.
 * Bazel's query proto bindings (`build_proto`) come from the published
