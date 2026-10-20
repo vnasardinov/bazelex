@@ -1,4 +1,4 @@
-package main
+package ui
 
 // Param is an input a query needs from the user. Its value is bound to the
 // named SQL parameter ":<Name>".

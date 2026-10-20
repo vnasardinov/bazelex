@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"database/sql"
@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "modernc.org/sqlite"
 
 	"github.com/vnasardinov/bazelex/internal/graphdb"
 )
@@ -47,7 +49,7 @@ func getRows(t *testing.T, path, url string, rows int) string {
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	newServer(db, "g.sqlite", rows).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
+	NewServer(db, "g.sqlite", rows).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
 	if w.Code != 200 {
 		t.Fatalf("status %d", w.Code)
 	}

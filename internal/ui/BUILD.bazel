@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ui",
+    srcs = [
+        "queries.go",
+        "server.go",
+    ],
+    embedsrcs = ["index.html"],
+    importpath = "github.com/vnasardinov/bazelex/internal/ui",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "ui_test",
+    srcs = ["server_test.go"],
+    embed = [":ui"],
+    deps = [
+        "//internal/graphdb",
+        "@org_modernc_sqlite//:sqlite",
+    ],
+)

@@ -104,9 +104,11 @@ Then open <http://localhost:6060>. Notes:
 ## Layout
 
 * `cmd/bazelex/`: the command-line entry point (flags, running `bazel query`).
-* `cmd/bazelex_ui/`: the web UI for the example queries.
+* `cmd/bazelex_ui/`: the web UI entry point (flags, opening the database).
 * `internal/graphdb/`: the SQLite schema and the loader that turns a stream of
   query `Target` messages into rows. This is where the tests live.
+* `internal/ui/`: the web UI itself: the canned queries, the HTTP handler and the
+  page template.
 * Bazel's query proto bindings (`build_proto`) come from the published
   [buildtools](https://github.com/bazel-contrib/buildtools) module
   (`github.com/bazel-contrib/buildtools/v10`). `MODULE.bazel` overrides how

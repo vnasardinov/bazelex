@@ -25,6 +25,7 @@ Run the tool from inside a workspace. Under `bazel run`, `main` changes into `BU
 
 - `cmd/bazelex/`: flags, runs `bazel query --output=streamed_proto --keep_going` (default pattern `//...:all-targets`, because plain `//...` returns rules only) or reads that stream from stdin, then calls `graphdb.Load`.
 - `internal/graphdb/`: `Schema` (the DDL, with column semantics documented inline) and `Load`, which reads length-delimited `Target` messages and writes `target` and `edge` rows in one transaction. After all inserts, one `UPDATE` resolves `edge.to_id`. It stays NULL for labels not in the loaded graph, such as external repos.
+- `cmd/bazelex_ui/` and `internal/ui/`: a read-only web page that runs the README's example queries against a database written by `bazelex`. `main.go` only handles flags and opening the database. `internal/ui` has the canned queries (`queries.go`), the handler and pagination (`server.go`) and the page template (`index.html`). Like `bazelex`, `main` changes into `BUILD_WORKING_DIRECTORY` first.
 - Bazel's query proto bindings come from the published `github.com/bazel-contrib/buildtools/v10` module (`build_proto`), not a local copy. `MODULE.bazel` has a `go_deps.gazelle_override` for that module (`build_file_generation = "clean"`, `gazelle:proto disable`) so it compiles its checked-in `build.gen.pb.go` as plain Go. Without the override, Bazel compiles protoc from source, which is very slow.
 
 Edge extraction (`ruleEdges` and `labelsOf` in `load.go`) is the part that takes care:
