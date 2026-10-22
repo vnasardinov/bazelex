@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protodelim"
 
+	// https://github.com/bazel-contrib/buildtools/blob/main/build_proto/build.proto
 	bpb "github.com/bazel-contrib/buildtools/v10/build_proto"
 )
 
