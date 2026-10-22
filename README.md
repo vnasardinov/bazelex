@@ -180,7 +180,8 @@ Plain `//...` in `query` returns only rules, so the default pattern is
 
 See [`internal/graphdb/schema.go`](internal/graphdb/schema.go). Two tables: `target` (one row per rule, source
 file, generated file, ...) and `edge` (one row per dependency, tagged with the
-attribute it came from and whether it came from a `select()` branch).
+attribute it came from and whether it came from a `select()` branch). A view, `rule_dep`, selects the
+rule-to-rule `deps`/`embed` edges that the recursive queries below build on.
 
 ## Example queries
 
@@ -207,12 +208,13 @@ SELECT t.label FROM r JOIN target t ON t.id = r.id;
 
 ### More recursive queries
 
-These all use the same building block: rule-to-rule dependency edges, with
-`attr` limited to `deps` and `embed`. Include `data` as well if you care about
-runtime dependencies, and leave `visibility` and the implicit `$...`/`:...`
-attributes out. Cycles can't make these run forever: the queries that track
-depth or paths have a depth limit, and the others use `UNION`, which drops
-duplicate rows.
+These are built on the `rule_dep(from_id, to_id)` view: rule-to-rule dependency
+edges, with `attr` limited to `deps` and `embed`. The view is defined in the
+schema. Query `edge` directly instead (as the shortest-path query does) if you
+want `data` as well for runtime dependencies. Leave `visibility` and the
+implicit `$...`/`:...` attributes out. Cycles can't make these run forever: the
+queries that track depth or paths have a depth limit, and the others use
+`UNION`, which drops duplicate rows.
 
 Direct and transitive impact of changing a target, that is everything that
 (transitively) depends on it:
@@ -261,17 +263,11 @@ the length of the longest chain in the whole graph:
 
 ```sql
 WITH RECURSIVE
-  dep(f, t) AS (
-    SELECT DISTINCT e.from_id, e.to_id FROM edge e
-    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
-    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
-    WHERE e.attr IN ('deps', 'embed')
-  ),
-  roots(id) AS (SELECT f FROM dep EXCEPT SELECT t FROM dep),
+  roots(id) AS (SELECT from_id FROM rule_dep EXCEPT SELECT to_id FROM rule_dep),
   walk(id, depth) AS (
     SELECT id, 0 FROM roots
     UNION
-    SELECT dep.t, walk.depth + 1 FROM dep JOIN walk ON dep.f = walk.id
+    SELECT d.to_id, walk.depth + 1 FROM rule_dep d JOIN walk ON d.from_id = walk.id
     WHERE walk.depth < 100
   )
 SELECT t.label, MAX(walk.depth) AS depth
@@ -289,16 +285,10 @@ here, because it computes the full closure from every rule:
 
 ```sql
 WITH RECURSIVE
-  dep(f, t) AS (
-    SELECT DISTINCT e.from_id, e.to_id FROM edge e
-    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
-    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
-    WHERE e.attr IN ('deps', 'embed')
-  ),
   closure(root, id) AS (
     SELECT id, id FROM target WHERE kind = 'rule'
     UNION
-    SELECT closure.root, dep.t FROM dep JOIN closure ON dep.f = closure.id
+    SELECT closure.root, d.to_id FROM rule_dep d JOIN closure ON d.from_id = closure.id
   )
 SELECT t.label, COUNT(*) - 1 AS transitive_deps
 FROM closure JOIN target t ON t.id = closure.root

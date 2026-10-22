@@ -52,17 +52,11 @@ GROUP BY t.label ORDER BY n DESC;`,
 		Description: "The longest dependency chain from any top-level rule down to each rule. The largest value is the length of the longest chain in the graph; if it equals the depth limit (100), the graph probably has a cycle.",
 		RowLink:     &RowLink{Column: "label", ToQuery: "longest-chain", ToParam: "target"},
 		SQL: `WITH RECURSIVE
-  dep(f, t) AS (
-    SELECT DISTINCT e.from_id, e.to_id FROM edge e
-    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
-    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
-    WHERE e.attr IN ('deps', 'embed')
-  ),
-  roots(id) AS (SELECT f FROM dep EXCEPT SELECT t FROM dep),
+  roots(id) AS (SELECT from_id FROM rule_dep EXCEPT SELECT to_id FROM rule_dep),
   walk(id, depth) AS (
     SELECT id, 0 FROM roots
     UNION
-    SELECT dep.t, walk.depth + 1 FROM dep JOIN walk ON dep.f = walk.id
+    SELECT d.to_id, walk.depth + 1 FROM rule_dep d JOIN walk ON d.from_id = walk.id
     WHERE walk.depth < 100
   )
 SELECT t.label, MAX(walk.depth) AS depth
@@ -76,16 +70,10 @@ GROUP BY t.label ORDER BY depth DESC;`,
 		Expensive:   true,
 		RowLink:     &RowLink{Column: "label", ToQuery: "transitive-deps", ToParam: "target", NewTab: true},
 		SQL: `WITH RECURSIVE
-  dep(f, t) AS (
-    SELECT DISTINCT e.from_id, e.to_id FROM edge e
-    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
-    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
-    WHERE e.attr IN ('deps', 'embed')
-  ),
   closure(root, id) AS (
     SELECT id, id FROM target WHERE kind = 'rule'
     UNION
-    SELECT closure.root, dep.t FROM dep JOIN closure ON dep.f = closure.id
+    SELECT closure.root, d.to_id FROM rule_dep d JOIN closure ON d.from_id = closure.id
   )
 SELECT t.label, COUNT(*) - 1 AS transitive_deps
 FROM closure JOIN target t ON t.id = closure.root
@@ -151,27 +139,21 @@ ORDER BY depth LIMIT 1;`,
 		Description: "The chain of deps/embed edges, from a top-level rule down to the target, whose length is the target's depth in \"Depth of every rule\". Several chains can tie for the longest; this shows one of them.",
 		Params:      []Param{{"target", "Target", "//foo:bar"}},
 		SQL: `WITH RECURSIVE
-  dep(f, t) AS (
-    SELECT DISTINCT e.from_id, e.to_id FROM edge e
-    JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
-    JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
-    WHERE e.attr IN ('deps', 'embed')
-  ),
-  roots(id) AS (SELECT f FROM dep EXCEPT SELECT t FROM dep),
+  roots(id) AS (SELECT from_id FROM rule_dep EXCEPT SELECT to_id FROM rule_dep),
   walk(id, depth) AS (
     SELECT id, 0 FROM roots
     UNION
-    SELECT dep.t, walk.depth + 1 FROM dep JOIN walk ON dep.f = walk.id
+    SELECT d.to_id, walk.depth + 1 FROM rule_dep d JOIN walk ON d.from_id = walk.id
     WHERE walk.depth < 100
   ),
   depth(id, depth) AS (SELECT id, MAX(depth) FROM walk GROUP BY id),
   -- One parent per rule, one level shallower: following these from the target
   -- gives a single longest chain.
   parent(id, p) AS (
-    SELECT dep.t, MIN(dep.f) FROM dep
-    JOIN depth df ON df.id = dep.f
-    JOIN depth dt ON dt.id = dep.t AND df.depth = dt.depth - 1
-    GROUP BY dep.t
+    SELECT d.to_id, MIN(d.from_id) FROM rule_dep d
+    JOIN depth df ON df.id = d.from_id
+    JOIN depth dt ON dt.id = d.to_id AND df.depth = dt.depth - 1
+    GROUP BY d.to_id
   ),
   up(id, depth, len, path) AS (
     SELECT depth.id, depth.depth, depth.depth, t.label

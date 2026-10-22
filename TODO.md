@@ -45,9 +45,6 @@ the main data-model decision still open.
 
 ## Smaller improvements
 
--   **A `rule_dep` view.** Every recursive query repeats the same
-    rule-to-rule `deps`/`embed` edge selection. A view in the schema
-    would make them much shorter.
 -   **Implicit-attribute edges.** In `buildtools` they dominate the edge
     table: attributes such as `$go_context_data` and `:xcode_config`
     each contribute 78 edges. They carry their own attribute names, so

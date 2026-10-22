@@ -32,4 +32,13 @@ CREATE INDEX edge_from ON edge(from_id);
 CREATE INDEX edge_to_id ON edge(to_id);
 CREATE INDEX edge_to_label ON edge(to_label);
 CREATE INDEX target_package ON target(package);
+
+-- Rule-to-rule dependencies: the building block of the recursive queries.
+-- Only deps and embed edges count (go_binary embeds its library), and both
+-- ends must be rules in the loaded graph.
+CREATE VIEW rule_dep(from_id, to_id) AS
+  SELECT DISTINCT e.from_id, e.to_id FROM edge e
+  JOIN target f ON f.id = e.from_id AND f.kind = 'rule'
+  JOIN target t ON t.id = e.to_id AND t.kind = 'rule'
+  WHERE e.attr IN ('deps', 'embed');
 `
