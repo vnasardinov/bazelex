@@ -89,13 +89,13 @@ GROUP BY t.label ORDER BY transitive_deps DESC;`,
 	{
 		ID:          "transitive-deps",
 		Title:       "Transitive dependencies",
-		Description: "Everything a target depends on, directly or indirectly, via deps edges.",
+		Description: "Everything a target depends on, directly or indirectly, via deps and embed edges.",
 		Params:      []Param{{"target", "Target", "//foo:bar"}},
 		SQL: `WITH RECURSIVE r(id) AS (
   SELECT id FROM target WHERE label = :target
   UNION
   SELECT e.to_id FROM edge e JOIN r ON e.from_id = r.id
-  WHERE e.attr = 'deps' AND e.to_id IS NOT NULL
+  WHERE e.attr IN ('deps', 'embed') AND e.to_id IS NOT NULL
 )
 SELECT t.label FROM r JOIN target t ON t.id = r.id;`,
 	},

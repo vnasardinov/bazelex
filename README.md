@@ -192,14 +192,14 @@ WHERE e.attr = 'deps'
 GROUP BY t.label ORDER BY n DESC LIMIT 10;
 ```
 
-Transitive `deps` of a target, using a recursive CTE:
+Transitive `deps` and `embed` of a target, using a recursive CTE:
 
 ```sql
 WITH RECURSIVE r(id) AS (
   SELECT id FROM target WHERE label = '//foo:bar'
   UNION
   SELECT e.to_id FROM edge e JOIN r ON e.from_id = r.id
-  WHERE e.attr = 'deps' AND e.to_id IS NOT NULL
+  WHERE e.attr IN ('deps', 'embed') AND e.to_id IS NOT NULL
 )
 SELECT t.label FROM r JOIN target t ON t.id = r.id;
 ```
