@@ -27,7 +27,7 @@
     {{if .Rows}}
     <table>
       <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
-      {{range .Rows}}<tr>{{range .}}<td>{{if .URL}}<a href="{{.URL}}">{{.Text}}</a>{{else}}{{.Text}}{{end}}</td>{{end}}</tr>{{end}}
+      {{range .Rows}}<tr>{{range .}}<td>{{if .URL}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Text}}</a>{{else}}{{.Text}}{{end}}</td>{{end}}</tr>{{end}}
     </table>
     {{else}}<p class="note">No rows.</p>{{end}}
     {{if or .PrevURL .NextURL}}

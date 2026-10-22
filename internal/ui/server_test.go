@@ -98,8 +98,10 @@ func TestSelfContainedQueries(t *testing.T) {
 		t.Error("heaviest should be offered, not run")
 	}
 	body = get(t, path, "/?run=heaviest")
-	if !strings.Contains(body, "<td>//p:a</td><td>2</td>") {
-		t.Errorf("heaviest missing:\n%s", body)
+	// Its labels link to transitive-deps in a new tab, without "run", so the
+	// new page doesn't re-run the expensive query.
+	if !strings.Contains(body, `<a href="?transitive-deps.target=%2F%2Fp%3Aa#transitive-deps" target="_blank" rel="noopener">//p:a</a></td><td>2</td>`) {
+		t.Errorf("heaviest missing or links wrong:\n%s", body)
 	}
 }
 

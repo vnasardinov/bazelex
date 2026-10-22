@@ -42,10 +42,12 @@ func NewServer(db *sql.DB, dbName string, pageRows int) http.Handler {
 	return mux
 }
 
-// cell is one value in a result row. URL is set when it should be a link.
+// cell is one value in a result row. URL is set when it should be a link, and
+// NewTab when the link should open in a new browser tab.
 type cell struct {
-	Text string
-	URL  string
+	Text   string
+	URL    string
+	NewTab bool
 }
 
 // queryView is what the template renders for one query.
@@ -130,8 +132,17 @@ func (v *queryView) addRowLinks(params url.Values) {
 	if col < 0 {
 		return
 	}
+	if v.RowLink.NewTab {
+		p := url.Values{}
+		for k, vs := range params {
+			p[k] = vs
+		}
+		p.Del("run")
+		params = p
+	}
 	for _, row := range v.Rows {
 		row[col].URL = linkURL(params, v.RowLink.ToQuery, v.RowLink.ToParam, row[col].Text)
+		row[col].NewTab = v.RowLink.NewTab
 	}
 }
 

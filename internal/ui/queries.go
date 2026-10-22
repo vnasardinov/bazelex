@@ -22,11 +22,15 @@ type Query struct {
 }
 
 // RowLink makes each value in Column a link that opens the query ToQuery with
-// its parameter ToParam set to that value.
+// its parameter ToParam set to that value. With NewTab, the link opens in a new
+// browser tab and doesn't carry over the "run" parameter, so the results being
+// linked from stay on the page they are on and the new page doesn't re-run an
+// expensive query.
 type RowLink struct {
 	Column  string
 	ToQuery string
 	ToParam string
+	NewTab  bool
 }
 
 // selfContained reports whether the query needs no user input.
@@ -70,6 +74,7 @@ GROUP BY t.label ORDER BY depth DESC;`,
 		Title:       "Heaviest targets",
 		Description: "How many rules each rule pulls in transitively. This computes the full closure from every rule, so it is slow on large graphs.",
 		Expensive:   true,
+		RowLink:     &RowLink{Column: "label", ToQuery: "transitive-deps", ToParam: "target", NewTab: true},
 		SQL: `WITH RECURSIVE
   dep(f, t) AS (
     SELECT DISTINCT e.from_id, e.to_id FROM edge e
