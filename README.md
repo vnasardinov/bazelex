@@ -99,8 +99,9 @@ Then open <http://localhost:6060>. Notes:
   as its own options.
 * For a parameterized query, fill in its inputs and press Run. The inputs autocomplete from the
   rule labels in the database, and their values are kept in the URL.
-* The database is opened read-only, and each query is limited to 10 seconds,
-  because the recursive queries can be slow on large graphs.
+* The database is opened read-only, and each query is limited to 120 seconds
+  (change it with `--timeout`, for example `--timeout=5m`), because the recursive
+  queries can be slow on large graphs.
 * The UI never runs Bazel, so it can serve a database of any project. Run it
   from a bazelex checkout and point `--db` at the file, or use the built binary
   (`bazel build //cmd/bazelex_ui`, then `bazel-bin/cmd/bazelex_ui/bazelex_ui_/bazelex_ui`).

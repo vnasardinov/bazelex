@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -49,7 +50,7 @@ func getRows(t *testing.T, path, url string, rows int) string {
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	NewServer(db, "g.sqlite", rows).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
+	NewServer(db, "g.sqlite", rows, 10*time.Second).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
 	if w.Code != 200 {
 		t.Fatalf("status %d", w.Code)
 	}

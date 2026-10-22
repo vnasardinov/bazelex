@@ -17,10 +17,7 @@ import (
 	"time"
 )
 
-const (
-	queryTimeout = 10 * time.Second
-	maxLabels    = 20000
-)
+const maxLabels = 20000
 
 //go:embed index.html
 var indexHTML string
@@ -30,13 +27,15 @@ var indexTmpl = template.Must(template.New("index").Parse(indexHTML))
 type server struct {
 	db       *sql.DB
 	dbName   string
-	pageRows int // rows shown per page
+	pageRows int           // rows shown per page
+	timeout  time.Duration // limit on each query
 }
 
 // NewServer returns a handler serving the page for db. dbName is shown in the
-// page header, and pageRows is the maximum number of result rows shown at once.
-func NewServer(db *sql.DB, dbName string, pageRows int) http.Handler {
-	s := &server{db: db, dbName: dbName, pageRows: pageRows}
+// page header, pageRows is the maximum number of result rows shown at once, and
+// timeout limits how long each query may run.
+func NewServer(db *sql.DB, dbName string, pageRows int, timeout time.Duration) http.Handler {
+	s := &server{db: db, dbName: dbName, pageRows: pageRows, timeout: timeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	return mux
@@ -177,7 +176,7 @@ func pageURL(params url.Values, id string, page int) string {
 // v.Page. It reports whether there are more rows after that page.
 func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
 	v.Ran = true
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
 	args := make([]any, 0, len(v.Params))
