@@ -87,21 +87,25 @@ func TestSelfContainedQueries(t *testing.T) {
 	path := testDB(t)
 	body := get(t, path, "/")
 	// Cheap queries run on load.
-	if !strings.Contains(body, "<td>//p:b</td><td>1</td>") {
+	if !strings.Contains(body, "<td>//p:b</td><td class=\"num\">1</td>") {
 		t.Errorf("most-depended-on missing:\n%s", body)
 	}
 	// The label links to the longest-chain query.
-	if !strings.Contains(body, `href="?longest-chain.target=%2F%2Fp%3Ac#longest-chain">//p:c</a></td><td>2</td>`) {
+	if !strings.Contains(body, `href="?longest-chain.target=%2F%2Fp%3Ac#longest-chain">//p:c</a></td><td class="num">2</td>`) {
 		t.Errorf("rule-depth missing:\n%s", body)
 	}
 	// The expensive one waits to be asked for.
-	if !strings.Contains(body, "?run=heaviest") || strings.Contains(body, "<th>transitive_deps</th>") {
+	if !strings.Contains(body, "?run=heaviest") || strings.Contains(body, "transitive_deps</th>") {
 		t.Error("heaviest should be offered, not run")
 	}
 	body = get(t, path, "/?run=heaviest")
+	// Numeric columns, header included, are right-aligned.
+	if !strings.Contains(body, `<th class="num">transitive_deps</th>`) {
+		t.Errorf("numeric header not aligned:\n%s", body)
+	}
 	// Its labels link to transitive-deps in a new tab, without "run", so the
 	// new page doesn't re-run the expensive query.
-	if !strings.Contains(body, `<a href="?transitive-deps.target=%2F%2Fp%3Aa#transitive-deps" target="_blank" rel="noopener">//p:a</a></td><td>2</td>`) {
+	if !strings.Contains(body, `<a href="?transitive-deps.target=%2F%2Fp%3Aa#transitive-deps" target="_blank" rel="noopener">//p:a</a></td><td class="num">2</td>`) {
 		t.Errorf("heaviest missing or links wrong:\n%s", body)
 	}
 }
@@ -199,12 +203,12 @@ func TestLongestChain(t *testing.T) {
 	db.Close()
 
 	got := getRows(t, path, "/?longest-chain.target=//p:c", 20)
-	if !strings.Contains(got, "<td>2</td><td>//p:a -&gt; //p:b -&gt; //p:c</td>") {
+	if !strings.Contains(got, "<td class=\"num\">2</td><td>//p:a -&gt; //p:b -&gt; //p:c</td>") {
 		t.Errorf("chain wrong:\n%s", got)
 	}
 	// A top-level rule is its own chain, of length 0.
 	got = getRows(t, path, "/?longest-chain.target=//p:x", 20)
-	if !strings.Contains(got, "<td>0</td><td>//p:x</td>") {
+	if !strings.Contains(got, "<td class=\"num\">0</td><td>//p:x</td>") {
 		t.Errorf("root chain wrong:\n%s", got)
 	}
 }

@@ -42,11 +42,13 @@ func NewServer(db *sql.DB, dbName string, pageRows int, timeout time.Duration) h
 }
 
 // cell is one value in a result row. URL is set when it should be a link, and
-// NewTab when the link should open in a new browser tab.
+// NewTab when the link should open in a new browser tab. Num is set for numbers,
+// which are right-aligned.
 type cell struct {
 	Text   string
 	URL    string
 	NewTab bool
+	Num    bool
 }
 
 // queryView is what the template renders for one query.
@@ -57,6 +59,7 @@ type queryView struct {
 	Err     string
 	Columns []string
 	Rows    [][]cell
+	NumCols []bool // columns whose every value is a number, for aligning the header
 	Limit   int
 	// Page is the 1-based page of results shown. PrevURL and NextURL are empty
 	// when there is no such page.
@@ -102,6 +105,7 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		default:
 			hasNext := s.run(r.Context(), &v)
 			v.addRowLinks(r.URL.Query())
+			v.markNumericColumns()
 			v.FirstRow = (v.Page-1)*s.pageRows + 1
 			v.LastRow = v.FirstRow + len(v.Rows) - 1
 			if v.Page > 1 {
@@ -119,6 +123,17 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := indexTmpl.Execute(w, page); err != nil {
 		log.Printf("render: %v", err)
+	}
+}
+
+// markNumericColumns records which columns hold only numbers.
+func (v *queryView) markNumericColumns() {
+	v.NumCols = make([]bool, len(v.Columns))
+	for i := range v.NumCols {
+		v.NumCols[i] = len(v.Rows) > 0
+		for _, row := range v.Rows {
+			v.NumCols[i] = v.NumCols[i] && row[i].Num
+		}
 	}
 }
 
@@ -218,6 +233,9 @@ func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
 				row[i].Text = "NULL"
 			case []byte:
 				row[i].Text = string(x)
+			case int64, float64:
+				row[i].Text = fmt.Sprint(x)
+				row[i].Num = true
 			default:
 				row[i].Text = fmt.Sprint(x)
 			}

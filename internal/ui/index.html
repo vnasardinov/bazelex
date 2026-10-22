@@ -11,6 +11,7 @@
   table { border-collapse: collapse; margin-top: 1em; }
   th, td { border: 1px solid #ddd; padding: 2px 8px; text-align: left; font-family: monospace; }
   th { background: #f4f4f4; }
+  th.num, td.num { text-align: right; }
   .err { color: #b00; white-space: pre-wrap; }
   .note { color: #666; }
   pre { background: #f8f8f8; padding: .5em; overflow-x: auto; }
@@ -26,8 +27,8 @@
   {{else if .Ran}}
     {{if .Rows}}
     <table>
-      <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
-      {{range .Rows}}<tr>{{range .}}<td>{{if .URL}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Text}}</a>{{else}}{{.Text}}{{end}}</td>{{end}}</tr>{{end}}
+      <tr>{{range $i, $c := .Columns}}<th{{if index $.NumCols $i}} class="num"{{end}}>{{$c}}</th>{{end}}</tr>
+      {{range .Rows}}<tr>{{range .}}<td{{if .Num}} class="num"{{end}}>{{if .URL}}<a href="{{.URL}}"{{if .NewTab}} target="_blank" rel="noopener"{{end}}>{{.Text}}</a>{{else}}{{.Text}}{{end}}</td>{{end}}</tr>{{end}}
     </table>
     {{else}}<p class="note">No rows.</p>{{end}}
     {{if or .PrevURL .NextURL}}
