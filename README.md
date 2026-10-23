@@ -75,7 +75,8 @@ and shows the results 20 rows at a time (see `--rows`), with Previous and Next
 links for longer results. The page has two sections:
 
 * Self-contained queries need no input: most depended-on targets, depth of
-  every rule, and heaviest targets. The first two run when the page loads.
+  every rule, heaviest targets, choke points, rules tagged `manual`, and public
+  rules used only in their own package. All but heaviest targets run when the page loads.
   Heaviest targets is expensive, so it only runs when you click its "Run this
   query" link. Each label in the depth results links to the longest dependency
   chain to that rule.
@@ -317,4 +318,19 @@ WITH RECURSIVE
 SELECT t.label, COUNT(*) - 1 AS transitive_deps
 FROM closure JOIN target t ON t.id = closure.root
 GROUP BY t.label ORDER BY transitive_deps DESC LIMIT 10;
+```
+
+Choke points: rules with both many direct dependents and many direct
+dependencies, ranked by the product of the two. This is a cheap stand-in for
+betweenness (see [docs/choke-points.md](docs/choke-points.md) for better
+measures):
+
+```sql
+WITH
+  fan_in(id, n) AS (SELECT to_id, COUNT(*) FROM rule_dep GROUP BY to_id),
+  fan_out(id, n) AS (SELECT from_id, COUNT(*) FROM rule_dep GROUP BY from_id)
+SELECT t.label, fan_in.n AS fan_in, fan_out.n AS fan_out,
+       fan_in.n * fan_out.n AS score
+FROM fan_in JOIN fan_out USING (id) JOIN target t ON t.id = fan_in.id
+ORDER BY score DESC, t.label LIMIT 10;
 ```

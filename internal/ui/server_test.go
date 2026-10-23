@@ -108,6 +108,11 @@ func TestSelfContainedQueries(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, body)
 		}
 	}
+	// b sits between a and c, so it is the only choke point. Its label links to
+	// the impact query.
+	if !strings.Contains(body, `href="?impact.target=%2F%2Fp%3Ab#impact">//p:b</a></td><td class="num">1</td><td class="num">1</td><td class="num">1</td>`) {
+		t.Errorf("choke-points missing:\n%s", body)
+	}
 	// The expensive one waits to be asked for.
 	if !strings.Contains(body, "?run=heaviest") || strings.Contains(body, "transitive_deps</th>") {
 		t.Error("heaviest should be offered, not run")

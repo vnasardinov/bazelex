@@ -26,8 +26,10 @@ The figures are from running bazelex over the
 -   **`select()` usage.** Which targets use `select`, and which
     `config_setting` is the most common key. The data is already in
     `edge` (`in_select` and the `<select_condition>` attr).
--   **Choke points.** Targets with a high product of fan-in and fan-out,
-    as a cheap stand-in for betweenness.
+-   **Choke points, more accurate.** The web UI ranks targets by the
+    product of fan-in and fan-out. See [docs/choke-points.md](docs/choke-points.md)
+    for better measures (ancestors times descendants, dominators, exact
+    betweenness).
 -   **Snapshot diffs.** `ATTACH` two databases built from different
     commits and diff the edges. Needs no code.
 

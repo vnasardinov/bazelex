@@ -106,6 +106,19 @@ WHERE t.kind = 'rule'
 ORDER BY t.label;`,
 	},
 	{
+		ID:          "choke-points",
+		Title:       "Choke points",
+		Description: "Rules with both many direct dependents (fan-in) and many direct dependencies (fan-out), ranked by their product. A cheap stand-in for betweenness: changes to these rules ripple widely, and they sit between many other rules. Rules with no dependents or no dependencies score 0 and are left out.",
+		RowLink:     &RowLink{Column: "label", ToQuery: "impact", ToParam: "target"},
+		SQL: `WITH
+  fan_in(id, n) AS (SELECT to_id, COUNT(*) FROM rule_dep GROUP BY to_id),
+  fan_out(id, n) AS (SELECT from_id, COUNT(*) FROM rule_dep GROUP BY from_id)
+SELECT t.label, fan_in.n AS fan_in, fan_out.n AS fan_out,
+       fan_in.n * fan_out.n AS score
+FROM fan_in JOIN fan_out USING (id) JOIN target t ON t.id = fan_in.id
+ORDER BY score DESC, t.label;`,
+	},
+	{
 		ID:          "transitive-deps",
 		Title:       "Transitive dependencies",
 		Description: "Everything a target depends on, directly or indirectly, via deps and embed edges.",
