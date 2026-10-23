@@ -28,6 +28,21 @@ CREATE TABLE edge (
   nodep     INTEGER NOT NULL  -- 1 if the attribute does not create a build dependency
 );
 
+-- Non-label attribute values of rules, one row per value. Lists are exploded
+-- (tags = ["a", "b"] gives two rows), dicts become "key=value" rows, booleans
+-- are "true"/"false" and tristates are "yes"/"no"/"auto". Only attributes set
+-- explicitly in the BUILD file are stored, so a missing row means "default":
+-- no testonly row means testonly = False. The exception is visibility, which
+-- is always stored, with package default_visibility already applied. Label
+-- values of visibility also appear as edges. select() values are not stored.
+CREATE TABLE attribute (
+  target_id INTEGER NOT NULL REFERENCES target(id),
+  name      TEXT NOT NULL, -- e.g. testonly, tags, size, visibility
+  value     TEXT NOT NULL
+);
+
+CREATE INDEX attribute_target ON attribute(target_id);
+CREATE INDEX attribute_name_value ON attribute(name, value);
 CREATE INDEX edge_from ON edge(from_id);
 CREATE INDEX edge_to_id ON edge(to_id);
 CREATE INDEX edge_to_label ON edge(to_label);

@@ -152,6 +152,13 @@ Plain `//...` in `query` returns only rules, so the default pattern is
     in external repos.
   * Three special `attr` values mark edges that don't come from a normal
     attribute: `<implicit>`, `<generating_rule>` and `<select_condition>`.
+* `attribute`: one row per non-label attribute value of a rule, as
+  `(target_id, name, value)`: `tags`, `size`, `testonly`, `visibility` and so on.
+  * Lists become one row per element, dicts become `key=value` rows.
+  * Only attributes set explicitly in the BUILD file are stored, so a missing
+    row means the default. `visibility` is always stored, with the package's
+    `default_visibility` applied. It is also still in `edge`.
+  * `select()` values are not stored.
 * `schema.go` documents the columns.
 
 ## Results on the buildtools repo
@@ -173,13 +180,14 @@ Plain `//...` in `query` returns only rules, so the default pattern is
   `deps` edges.
 * **Dependency changes.** `go.mod`, `go.sum` and `MODULE.bazel` include sqlite
   and its transitive dependencies.
-* **Not modeled yet.** Non-label attributes such as `tags` and `visibility`
-  values aren't stored.
+* **Attribute defaults.** `attribute` has no rows for defaulted values, so
+  "not testonly" means "no `testonly = true` row". Attributes set through
+  `select()` are missing too.
 
 ## Schema
 
-See [`internal/graphdb/schema.go`](internal/graphdb/schema.go). Two tables: `target` (one row per rule, source
-file, generated file, ...) and `edge` (one row per dependency, tagged with the
+See [`internal/graphdb/schema.go`](internal/graphdb/schema.go). Three tables: `target` (one row per rule, source
+file, generated file, ...), `attribute` (non-label attribute values) and `edge` (one row per dependency, tagged with the
 attribute it came from and whether it came from a `select()` branch). A view, `rule_dep`, selects the
 rule-to-rule `deps`/`embed` edges that the recursive queries below build on.
 
@@ -204,6 +212,22 @@ WITH RECURSIVE r(id) AS (
   WHERE e.attr IN ('deps', 'embed') AND e.to_id IS NOT NULL
 )
 SELECT t.label FROM r JOIN target t ON t.id = r.id;
+```
+
+Rules tagged `manual`, and rules that are public but only used inside their
+own package:
+
+```sql
+SELECT t.label FROM target t JOIN attribute a ON a.target_id = t.id
+WHERE a.name = 'tags' AND a.value = 'manual';
+
+SELECT t.label FROM target t
+WHERE t.kind = 'rule'
+  AND EXISTS (SELECT 1 FROM attribute a WHERE a.target_id = t.id
+              AND a.name = 'visibility' AND a.value = '//visibility:public')
+  AND NOT EXISTS (SELECT 1 FROM edge e JOIN target f ON f.id = e.from_id
+                  WHERE e.to_id = t.id AND e.attr <> 'visibility'
+                  AND f.package <> t.package);
 ```
 
 ### More recursive queries

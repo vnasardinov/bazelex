@@ -22,6 +22,11 @@ func labelAttr(name string, typ bpb.Attribute_Discriminator, s string, list ...s
 	}
 }
 
+func explicit(a *bpb.Attribute) *bpb.Attribute {
+	a.ExplicitlySpecified = proto.Bool(true)
+	return a
+}
+
 func rule(name, class string, inputs []string, attrs ...*bpb.Attribute) *bpb.Target {
 	return &bpb.Target{
 		Type: bpb.Target_RULE.Enum(),
@@ -54,6 +59,10 @@ func testStream(t *testing.T) *bytes.Buffer {
 			labelAttr("deps", bpb.Attribute_LABEL_LIST, "", "//a:dep", "//a:dep"),
 			labelAttr("srcs", bpb.Attribute_LABEL_LIST, "", "//a:hdr.go"),
 			labelAttr("name", bpb.Attribute_STRING, "lib"),
+			explicit(labelAttr("tags", bpb.Attribute_STRING_LIST, "", "manual", "no-sandbox")),
+			explicit(&bpb.Attribute{Name: proto.String("testonly"), Type: bpb.Attribute_BOOLEAN.Enum(), BooleanValue: proto.Bool(true)}),
+			labelAttr("size", bpb.Attribute_STRING, "small"), // default, not explicit
+			labelAttr("visibility", bpb.Attribute_LABEL_LIST, "", "//visibility:public"),
 		),
 		rule("//a:dep", "go_library", nil, selectAttr),
 		{
@@ -124,9 +133,50 @@ func TestLoad(t *testing.T) {
 		{"//a:lib", "//tools:implicit", false, "<implicit>", 0},
 		{"//a:lib", "//a:dep", true, "deps", 0}, // duplicates collapsed
 		{"//a:lib", "//a:hdr.go", true, "srcs", 0},
+		{"//a:lib", "//visibility:public", false, "visibility", 0},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("edges mismatch\n got: %v\nwant: %v", got, want)
+	}
+}
+
+func TestLoadAttributes(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	if _, err := db.Exec(Schema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(db, testStream(t)); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.Query(`
+		SELECT t.label, a.name, a.value
+		FROM attribute a JOIN target t ON t.id = a.target_id
+		ORDER BY t.label, a.name, a.value`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got [][3]string
+	for rows.Next() {
+		var r [3]string
+		if err := rows.Scan(&r[0], &r[1], &r[2]); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, r)
+	}
+	want := [][3]string{
+		{"//a:lib", "tags", "manual"},
+		{"//a:lib", "tags", "no-sandbox"},
+		{"//a:lib", "testonly", "true"},
+		{"//a:lib", "visibility", "//visibility:public"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("attributes mismatch\n got: %v\nwant: %v", got, want)
 	}
 }
 

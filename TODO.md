@@ -31,18 +31,6 @@ The figures are from running bazelex over the
 -   **Snapshot diffs.** `ATTACH` two databases built from different
     commits and diff the edges. Needs no code.
 
-## Data we don't store yet
-
-Some useful questions need attributes that aren't in the
-[schema](https://github.com/vnasardinov/bazelex/blob/main/internal/graphdb/schema.go):
-`testonly`, `tags`, `size` and the actual `visibility` values. Examples:
-
--   Public targets that are only used inside their own package.
--   Targets tagged `manual`.
-
-An `attribute(target_id, name, value)` table would unlock these. This is
-the main data-model decision still open.
-
 ## Smaller improvements
 
 -   **Implicit-attribute edges.** In `buildtools` they dominate the edge

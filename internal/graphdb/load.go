@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -26,6 +27,11 @@ type edge struct {
 	attr     string
 	inSelect bool
 	nodep    bool
+}
+
+// attr is one non-label attribute value of a rule.
+type attr struct {
+	name, value string
 }
 
 // Load reads a stream of length-delimited bazel Target messages (the output of
@@ -53,6 +59,12 @@ func Load(db *sql.DB, r io.Reader) (n int, err error) {
 	}
 	defer insEdge.Close()
 
+	insAttr, err := tx.Prepare(`INSERT INTO attribute (target_id, name, value) VALUES (?, ?, ?)`)
+	if err != nil {
+		return 0, err
+	}
+	defer insAttr.Close()
+
 	br := bufio.NewReaderSize(r, 1<<20)
 	for {
 		t := &bpb.Target{}
@@ -78,6 +90,11 @@ func Load(db *sql.DB, r io.Reader) (n int, err error) {
 		for _, e := range edges {
 			if _, err := insEdge.Exec(id, e.to, e.attr, b2i(e.inSelect), b2i(e.nodep)); err != nil {
 				return n, fmt.Errorf("inserting edge %s -> %s: %w", label, e.to, err)
+			}
+		}
+		for _, a := range ruleAttrs(t.GetRule()) {
+			if _, err := insAttr.Exec(id, a.name, a.value); err != nil {
+				return n, fmt.Errorf("inserting attribute %s of %s: %w", a.name, label, err)
 			}
 		}
 		n++
@@ -152,6 +169,55 @@ func ruleEdges(r *bpb.Rule) []edge {
 		}
 	}
 	return edges
+}
+
+// ruleAttrs returns the stored values of a rule's non-label attributes: those
+// set explicitly in the BUILD file, plus visibility, which is always kept.
+// select() values and attributes that only hold labels or outputs are skipped.
+func ruleAttrs(r *bpb.Rule) []attr {
+	var out []attr
+	for _, a := range r.GetAttribute() {
+		name := a.GetName()
+		if name == "name" || (name != "visibility" && !a.GetExplicitlySpecified()) {
+			continue
+		}
+		add := func(vs ...string) {
+			for _, v := range vs {
+				out = append(out, attr{name, v})
+			}
+		}
+		switch a.GetType() {
+		case bpb.Attribute_STRING:
+			add(a.GetStringValue())
+		case bpb.Attribute_BOOLEAN:
+			add(strconv.FormatBool(a.GetBooleanValue()))
+		case bpb.Attribute_INTEGER:
+			add(strconv.Itoa(int(a.GetIntValue())))
+		case bpb.Attribute_TRISTATE:
+			add(strings.ToLower(a.GetTristateValue().String()))
+		case bpb.Attribute_STRING_LIST:
+			add(a.GetStringListValue()...)
+		case bpb.Attribute_INTEGER_LIST:
+			for _, i := range a.GetIntListValue() {
+				add(strconv.Itoa(int(i)))
+			}
+		case bpb.Attribute_STRING_DICT:
+			for _, e := range a.GetStringDictValue() {
+				add(e.GetKey() + "=" + e.GetValue())
+			}
+		case bpb.Attribute_STRING_LIST_DICT:
+			for _, e := range a.GetStringListDictValue() {
+				for _, v := range e.GetValue() {
+					add(e.GetKey() + "=" + v)
+				}
+			}
+		case bpb.Attribute_LABEL_LIST:
+			if name == "visibility" {
+				add(a.GetStringListValue()...)
+			}
+		}
+	}
+	return out
 }
 
 // labelsOf returns the labels held by an attribute value (or select entry) of
