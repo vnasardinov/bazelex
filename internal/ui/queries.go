@@ -54,7 +54,7 @@ GROUP BY t.label ORDER BY n DESC;`,
 	{
 		ID:          "rule-depth",
 		Title:       "Depth of every rule",
-		Description: "The longest dependency chain from any top-level rule down to each rule. The largest value is the length of the longest chain in the graph; if it equals the depth limit (100), the graph probably has a cycle.",
+		Description: "The longest dependency chain from any top-level rule down to each rule. The largest value is the length of the longest chain in the graph; there is no fixed depth limit, but the walk stops at the number of rules, which no chain in an acyclic graph can reach, so a value that large means a cycle.",
 		RowLink:     &RowLink{Column: "label", ToQuery: "longest-chain", ToParam: "target"},
 		SQL: `WITH RECURSIVE
   roots(id) AS (SELECT from_id FROM rule_dep EXCEPT SELECT to_id FROM rule_dep),
@@ -62,7 +62,7 @@ GROUP BY t.label ORDER BY n DESC;`,
     SELECT id, 0 FROM roots
     UNION
     SELECT d.to_id, walk.depth + 1 FROM rule_dep d JOIN walk ON d.from_id = walk.id
-    WHERE walk.depth < 100
+    WHERE walk.depth < (SELECT COUNT(*) FROM target WHERE kind = 'rule')
   )
 SELECT t.label, MAX(walk.depth) AS depth
 FROM walk JOIN target t ON t.id = walk.id
@@ -183,7 +183,7 @@ ORDER BY depth LIMIT 1;`,
     SELECT id, 0 FROM roots
     UNION
     SELECT d.to_id, walk.depth + 1 FROM rule_dep d JOIN walk ON d.from_id = walk.id
-    WHERE walk.depth < 100
+    WHERE walk.depth < (SELECT COUNT(*) FROM target WHERE kind = 'rule')
   ),
   depth(id, depth) AS (SELECT id, MAX(depth) FROM walk GROUP BY id),
   -- One parent per rule, one level shallower: following these from the target

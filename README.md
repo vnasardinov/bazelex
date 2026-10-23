@@ -240,8 +240,9 @@ edges, with `attr` limited to `deps` and `embed`. The view is defined in the
 schema. Query `edge` directly instead (as the shortest-path query does) if you
 want `data` as well for runtime dependencies. Leave `visibility` and the
 implicit `$...`/`:...` attributes out. Cycles can't make these run forever: the
-queries that track depth or paths have a depth limit, and the others use
-`UNION`, which drops duplicate rows.
+queries that track paths have a depth limit, the depth query is bounded by the
+number of rules, and the others use `UNION`, which drops duplicate rows. See
+[the depth query](#more-recursive-queries) for why cycles are possible at all.
 
 Direct and transitive impact of changing a target, that is everything that
 (transitively) depends on it:
@@ -295,7 +296,7 @@ WITH RECURSIVE
     SELECT id, 0 FROM roots
     UNION
     SELECT d.to_id, walk.depth + 1 FROM rule_dep d JOIN walk ON d.from_id = walk.id
-    WHERE walk.depth < 100
+    WHERE walk.depth < (SELECT COUNT(*) FROM target WHERE kind = 'rule')
   )
 SELECT t.label, MAX(walk.depth) AS depth
 FROM walk JOIN target t ON t.id = walk.id
@@ -303,8 +304,28 @@ GROUP BY t.label ORDER BY depth DESC LIMIT 10;
 ```
 
 This tracks `(target, depth)` pairs instead of whole paths, so it stays small
-even when the number of distinct paths is huge. If the top depth equals the
-limit, the graph probably has a cycle among these edges.
+even when the number of distinct paths is huge. Very deep chains are normal in
+large projects (TensorFlow has rules more than 100 levels down), so the walk has
+no fixed depth limit. It is bounded by the number of rules instead: a chain
+through N rules has at most N-1 edges, so real chains are never cut short. If
+the top depth reaches the number of rules, the graph has a cycle among these
+edges.
+
+Bazel forbids dependency cycles, so a cycle should not normally show up, but
+the graph in the database is not quite the graph Bazel builds:
+
+* `bazel query` reports the static graph. Every branch of every `select()` is
+  included, whereas Bazel checks for cycles in the graph of one configuration,
+  where only one branch is taken. Two branches that never apply together can
+  form a loop that no build ever sees.
+* With `--keep_going`, `bazel query` reports a dependency cycle as an error but
+  still prints the targets it found, so a broken workspace can be loaded.
+* With `-stdin`, bazelex loads whatever stream it is given, which Bazel has not
+  vetted.
+
+Dropping edges, as happens with a narrowed pattern or with external repos, can
+hide a cycle but never creates one. The bound is there so that a cycle ends the
+query with a recognizable result instead of running forever.
 
 Heaviest targets: how many rules each one pulls in transitively. This is the
 "how much does building this cost" number, and it is the most expensive query
