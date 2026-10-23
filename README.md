@@ -75,10 +75,11 @@ and shows the results 20 rows at a time (see `--rows`), with Previous and Next
 links for longer results. The page has two sections:
 
 * Self-contained queries need no input: most depended-on targets, depth of
-  every rule, heaviest targets, choke points, rules tagged `manual`, and public
-  rules used only in their own package. All but heaviest targets run when the page loads.
-  Heaviest targets is expensive, so it only runs when you click its "Run this
-  query" link. Each label in the depth results links to the longest dependency
+  every rule, heaviest targets, choke points, package coupling, package
+  dependency cycles, rules tagged `manual`, and public rules used only in their
+  own package. All but heaviest targets and package cycles run when the page
+  loads. Those two are expensive, so they only run when you click their "Run
+  this query" link. Each label in the depth results links to the longest dependency
   chain to that rule.
 * Parameterized queries need a target label: transitive dependencies, impact of
   changing a target, the shortest dependency path between two targets, and the
@@ -326,6 +327,63 @@ the graph in the database is not quite the graph Bazel builds:
 Dropping edges, as happens with a narrowed pattern or with external repos, can
 hide a cycle but never creates one. The bound is there so that a cycle ends the
 query with a recognizable result instead of running forever.
+
+Package coupling: collapse the rule-to-rule edges to package-to-package. Each
+row is a pair of packages, ranked by how many rule dependencies cross
+from the first to the second. `back_edges` counts the other direction, so a
+non-zero value marks two packages that depend on each other. Such a pair is
+listed once, in its heavier direction (the alphabetically first on a tie). This
+is a ranked list rather than a matrix, which suits SQL better:
+
+```sql
+WITH pkg_dep(from_pkg, to_pkg, n) AS (
+  SELECT f.package, t.package, COUNT(*)
+  FROM rule_dep d
+  JOIN target f ON f.id = d.from_id
+  JOIN target t ON t.id = d.to_id
+  WHERE f.package <> t.package
+  GROUP BY f.package, t.package
+)
+SELECT a.from_pkg, a.to_pkg, a.n AS edges, COALESCE(b.n, 0) AS back_edges
+FROM pkg_dep a LEFT JOIN pkg_dep b ON b.from_pkg = a.to_pkg AND b.to_pkg = a.from_pkg
+WHERE b.n IS NULL OR a.n > b.n OR (a.n = b.n AND a.from_pkg < a.to_pkg)
+ORDER BY edges + back_edges DESC, edges DESC, a.from_pkg, a.to_pkg LIMIT 10;
+```
+
+Package dependency cycles: groups of packages that depend on each other,
+directly or through other packages (the strongly connected components of the
+package graph). Bazel allows this as long as no rules form a cycle, but such
+packages can't be layered. The query computes which packages each package can
+reach, then names each group after its smallest member:
+
+```sql
+WITH RECURSIVE
+  pkg_dep(a, b) AS (
+    SELECT DISTINCT f.package, t.package
+    FROM rule_dep d
+    JOIN target f ON f.id = d.from_id
+    JOIN target t ON t.id = d.to_id
+    WHERE f.package <> t.package
+  ),
+  reach(a, b) AS (
+    SELECT a, b FROM pkg_dep
+    UNION
+    SELECT reach.a, pkg_dep.b FROM reach JOIN pkg_dep ON pkg_dep.a = reach.b
+  ),
+  member(pkg, comp) AS (
+    SELECT self.a, MIN(fwd.b)
+    FROM reach self
+    JOIN reach fwd ON fwd.a = self.a
+    JOIN reach back ON back.a = fwd.b AND back.b = self.a
+    WHERE self.b = self.a
+    GROUP BY self.a
+  )
+SELECT comp, COUNT(*) AS packages, GROUP_CONCAT(pkg, ', ') AS members
+FROM member GROUP BY comp ORDER BY packages DESC, comp;
+```
+
+The reachability set can have up to one row per pair of packages, so this is
+slow on large graphs (about 9 seconds on TensorFlow).
 
 Heaviest targets: how many rules each one pulls in transitively. This is the
 "how much does building this cost" number, and it is the most expensive query

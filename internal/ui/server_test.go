@@ -67,8 +67,17 @@ func TestIndexWithoutParams(t *testing.T) {
 			t.Errorf("missing %q", q.Title)
 		}
 	}
-	if strings.Contains(body, "<th>path</th>") || strings.Contains(body, "No rows") {
-		t.Error("no parameterized query should run without parameters")
+	// Self-contained queries may legitimately have no rows, so only look at
+	// the parameterized ones.
+	for _, q := range queries {
+		if q.selfContained() {
+			continue
+		}
+		start := strings.Index(body, `<section id="`+q.ID+`">`)
+		sec := body[start : start+strings.Index(body[start:], "</section>")]
+		if strings.Contains(sec, "<th") || strings.Contains(sec, "No rows") {
+			t.Errorf("%s should not run without parameters", q.ID)
+		}
 	}
 }
 
@@ -242,5 +251,50 @@ func TestLongestChain(t *testing.T) {
 	got = getRows(t, path, "/?longest-chain.target=//p:x", 20)
 	if !strings.Contains(got, "<td class=\"num\">0</td><td>//p:x</td>") {
 		t.Errorf("root chain wrong:\n%s", got)
+	}
+}
+
+func TestPackageCoupling(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "g.sqlite")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// x:a, x:a2 -> y:b -> x:c (x and y depend on each other), y:b -> z:d.
+	// w:e -> w:f stays inside one package.
+	stmts := []string{
+		graphdb.Schema,
+		`INSERT INTO target(id,label,kind,package,name) VALUES
+		  (1,'//x:a','rule','x','a'),(2,'//x:a2','rule','x','a2'),(3,'//y:b','rule','y','b'),
+		  (4,'//x:c','rule','x','c'),(5,'//z:d','rule','z','d'),
+		  (6,'//w:e','rule','w','e'),(7,'//w:f','rule','w','f')`,
+		`INSERT INTO edge VALUES (1,'//y:b',3,'deps',0,0),(2,'//y:b',3,'deps',0,0),
+		  (3,'//x:c',4,'deps',0,0),(3,'//z:d',5,'deps',0,0),(6,'//w:f',7,'deps',0,0)`,
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	body := get(t, path, "/")
+	// x -> y has two edges and one back edge; it ranks first.
+	if !strings.Contains(body, `<td>x</td><td>y</td><td class="num">2</td><td class="num">1</td>`) {
+		t.Errorf("package-coupling missing:\n%s", body)
+	}
+	// The reverse row of a mutual pair is the same information.
+	if strings.Contains(body, `<td>y</td><td>x</td>`) {
+		t.Error("mutual pair listed twice")
+	}
+	if strings.Contains(body, "<td>w</td>") {
+		t.Error("an edge within one package is not coupling")
+	}
+	body = get(t, path, "/?run=package-cycles")
+	if !strings.Contains(body, `<td>x</td><td class="num">2</td><td>x, y</td>`) {
+		t.Errorf("package-cycles missing:\n%s", body)
+	}
+	if strings.Contains(body, "z</td>") && strings.Contains(body, "x, y, z") {
+		t.Error("z is not in the cycle")
 	}
 }

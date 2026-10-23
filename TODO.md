@@ -13,8 +13,6 @@ The figures are from running bazelex over the
     `//edit:edit` has the most direct deps (10) and `//build:build` the
     most direct dependents (16). The counts change with which `attr`
     values you include.
--   **Package-level coupling and cycles.** Collapse edges to package-to-package.
-    A coupling matrix would show which packages are most entangled.
 -   **Dead-code candidates.** Rules with no dependents that aren't
     binaries or tests. ``buildtools`` has 74. This is a lead, not an answer:
     libraries are meant to be consumed from outside the workspace.
