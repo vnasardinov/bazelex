@@ -106,6 +106,8 @@ Then open <http://localhost:6060>. Notes:
 * The UI never runs Bazel, so it can serve a database of any project. Run it
   from a bazelex checkout and point `--db` at the file, or use the built binary
   (`bazel build //cmd/bazelex_ui`, then `bazel-bin/cmd/bazelex_ui/bazelex_ui_/bazelex_ui`).
+* A table of contents with a link to every query stays in view on the right
+  while you scroll. In a narrow window it moves to the top of the page.
 * The page is plain HTML rendered by Go templates, with no JavaScript.
 
 ## Layout

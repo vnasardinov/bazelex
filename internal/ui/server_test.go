@@ -72,6 +72,19 @@ func TestIndexWithoutParams(t *testing.T) {
 	}
 }
 
+func TestTableOfContents(t *testing.T) {
+	body := get(t, testDB(t), "/")
+	nav := body[strings.Index(body, "<nav"):strings.Index(body, "</nav>")]
+	for _, q := range queries {
+		if want := `<a href="#` + q.ID + `">` + q.Title + `</a>`; !strings.Contains(nav, want) {
+			t.Errorf("table of contents missing %q", want)
+		}
+	}
+	if !strings.Contains(nav, `heaviest">Heaviest targets</a> <span class="note">(slow)`) {
+		t.Error("expensive query not marked slow")
+	}
+}
+
 func TestQueriesRun(t *testing.T) {
 	path := testDB(t)
 	body := get(t, path, "/?transitive-deps.target=//p:a&impact.target=//p:c&shortest-path.from=//p:a&shortest-path.to=//p:c")

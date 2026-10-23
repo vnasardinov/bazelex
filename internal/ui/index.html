@@ -4,7 +4,18 @@
 <meta charset="utf-8">
 <title>bazelex</title>
 <style>
-  body { font: 14px/1.4 system-ui, sans-serif; max-width: 70em; margin: 2em auto; padding: 0 1em; }
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 2em auto; padding: 0 1em; }
+  .layout { display: grid; grid-template-columns: minmax(0, 70em) 16em; gap: 2em; justify-content: center; }
+  nav { grid-column: 2; grid-row: 1; align-self: start; position: sticky; top: 1em;
+        max-height: calc(100vh - 2em); overflow-y: auto; }
+  main { grid-column: 1; grid-row: 1; min-width: 0; }
+  nav h2 { font-size: 1em; margin: 0 0 .3em; }
+  nav ul { list-style: none; margin: 0 0 1em; padding: 0; }
+  nav li { margin: .2em 0; }
+  @media (max-width: 100em) {
+    .layout { display: block; max-width: 70em; margin: 0 auto; }
+    nav { position: static; max-height: none; margin-bottom: 1em; }
+  }
   section { border: 1px solid #ccc; border-radius: 6px; padding: 0 1em 1em; margin-bottom: 1.5em; }
   label { margin-right: 1em; }
   input[type=text] { width: 22em; font-family: monospace; }
@@ -18,6 +29,14 @@
 </style>
 </head>
 <body>
+<div class="layout">
+<nav aria-label="Queries">
+  <h2>Self-contained</h2>
+  <ul>{{range .SelfContained}}<li><a href="#{{.ID}}">{{.Title}}</a>{{if .Expensive}} <span class="note">(slow)</span>{{end}}</li>{{end}}</ul>
+  <h2>Parameterized</h2>
+  <ul>{{range .Parameterized}}<li><a href="#{{.ID}}">{{.Title}}</a></li>{{end}}</ul>
+</nav>
+<main>
 <h1>bazelex</h1>
 <p class="note">Database: <code>{{.DB}}</code>. Results are shown {{.Limit}} rows per page.</p>
 <datalist id="labels">{{range .Labels}}<option value="{{.}}">{{end}}</datalist>
@@ -71,5 +90,7 @@
 </section>
 {{end}}
 </form>
+</main>
+</div>
 </body>
 </html>
