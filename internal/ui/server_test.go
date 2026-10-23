@@ -28,6 +28,9 @@ func testDB(t *testing.T) string {
 		`INSERT INTO target(id,label,kind,package,name) VALUES
 		  (1,'//p:a','rule','p','a'),(2,'//p:b','rule','p','b'),(3,'//p:c','rule','p','c')`,
 		`INSERT INTO edge VALUES (1,'//p:b',2,'deps',0,0),(2,'//p:c',3,'deps',0,0)`,
+		// a is tagged manual; b is public but only used from its own package.
+		`INSERT INTO attribute(target_id,name,value) VALUES
+		  (1,'tags','manual'),(2,'visibility','//visibility:public')`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -93,6 +96,17 @@ func TestSelfContainedQueries(t *testing.T) {
 	// The label links to the longest-chain query.
 	if !strings.Contains(body, `href="?longest-chain.target=%2F%2Fp%3Ac#longest-chain">//p:c</a></td><td class="num">2</td>`) {
 		t.Errorf("rule-depth missing:\n%s", body)
+	}
+	// Rules tagged manual, and public rules used only in their own package.
+	for _, want := range []string{
+		`<section id="manual-rules">`,
+		`<section id="public-package-local">`,
+		"<td>//p:a</td>",
+		"<td>//p:b</td>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q in:\n%s", want, body)
+		}
 	}
 	// The expensive one waits to be asked for.
 	if !strings.Contains(body, "?run=heaviest") || strings.Contains(body, "transitive_deps</th>") {

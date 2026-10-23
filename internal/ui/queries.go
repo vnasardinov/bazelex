@@ -36,6 +36,11 @@ type RowLink struct {
 // selfContained reports whether the query needs no user input.
 func (q Query) selfContained() bool { return len(q.Params) == 0 }
 
+// queries is every canned query the page shows. Adding an entry here is all it
+// takes to surface a new query: index.html renders each one generically, the
+// self-contained ones (no Params) in the first section and the parameterized
+// ones in the second. Touch the template or server.go only if a query needs new
+// behavior.
 var queries = []Query{
 	{
 		ID:          "most-depended-on",
@@ -78,6 +83,27 @@ GROUP BY t.label ORDER BY depth DESC;`,
 SELECT t.label, COUNT(*) - 1 AS transitive_deps
 FROM closure JOIN target t ON t.id = closure.root
 GROUP BY t.label ORDER BY transitive_deps DESC;`,
+	},
+	{
+		ID:          "manual-rules",
+		Title:       "Rules tagged manual",
+		Description: "Rules with an explicit tags = [\"manual\"], which wildcard patterns such as //... skip.",
+		SQL: `SELECT t.label FROM target t JOIN attribute a ON a.target_id = t.id
+WHERE a.name = 'tags' AND a.value = 'manual'
+ORDER BY t.label;`,
+	},
+	{
+		ID:          "public-package-local",
+		Title:       "Public but only used in their own package",
+		Description: "Rules visible to //visibility:public that no rule in another package depends on, so their visibility could probably be narrowed. Visibility edges don't count as uses.",
+		SQL: `SELECT t.label FROM target t
+WHERE t.kind = 'rule'
+  AND EXISTS (SELECT 1 FROM attribute a WHERE a.target_id = t.id
+              AND a.name = 'visibility' AND a.value = '//visibility:public')
+  AND NOT EXISTS (SELECT 1 FROM edge e JOIN target f ON f.id = e.from_id
+                  WHERE e.to_id = t.id AND e.attr <> 'visibility'
+                  AND f.package <> t.package)
+ORDER BY t.label;`,
 	},
 	{
 		ID:          "transitive-deps",
