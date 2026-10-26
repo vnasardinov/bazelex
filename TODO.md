@@ -40,6 +40,21 @@ The figures are from running bazelex over the
     consider an `implicit` column so queries don't need to filter on
     name prefixes.
 
+## Web UI
+
+-   **Parallel cheap queries.** Run them in a bounded pool of goroutines,
+    with the limit set by a flag (default 5). SQLite allows concurrent
+    readers, each on its own connection, so `database/sql`'s pool works
+    as long as the database is opened read-only (or in WAL mode).
+-   **Per-query refresh without a page reload.** "Run this query" and
+    pagination currently re-render the whole page, which reruns every
+    cheap query too. Add a little JavaScript that fetches a single
+    query's result fragment and swaps it in. Keep the no-JS page as the
+    fallback.
+-   **Graph view.** Collapse the target graph by package and draw the
+    quotient graph. If that is still too large, let the user pick a
+    package and draw its neighbors out to a chosen depth.
+
 ## Code comprehension
 
 Rewrites that would make the code easier to read, mostly by adding or
