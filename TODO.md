@@ -51,13 +51,6 @@ reading every line). Listed in the order I'd tackle them.
     query is spread across `Ran`, `Skipped`, `Err` and an empty `Rows`,
     so the template has to know which combinations are possible.
     Consider a single `State` field that the template switches on.
--   **`Load` and `describe`** (`internal/graphdb/load.go`). `describe`
-    returns five positional values with runs of `""`, and `label == ""`
-    doubles as "unrecognized type, skip". `Load` combines a named `err`,
-    a deferred rollback and shadowed `err` in the loop, so the rollback
-    idiom is hard to confirm by inspection. Return a struct with an
-    explicit skip signal, and move the per-target inserts into a type
-    that owns the three prepared statements.
 -   **`ruleAttrs`** (`internal/graphdb/load.go`). The skip condition
     `name == "name" || (name != "visibility" && !explicit)` is a
     double negative. Name it, e.g.

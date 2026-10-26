@@ -34,97 +34,138 @@ type attr struct {
 	name, value string
 }
 
+// target is one target of the graph, before it is written to the database.
+type target struct {
+	label, kind, ruleClass, location string
+	edges                            []edge
+}
+
 // Load reads a stream of length-delimited bazel Target messages (the output of
 // `bazel query --output=streamed_proto`) and writes them into db, which must
 // already contain the schema. It returns the number of targets loaded.
-func Load(db *sql.DB, r io.Reader) (n int, err error) {
+func Load(db *sql.DB, r io.Reader) (int, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return 0, err
 	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback() // does nothing once the transaction is committed
 
-	insTarget, err := tx.Prepare(`INSERT INTO target (label, kind, package, name, rule_class, location) VALUES (?, ?, ?, ?, ?, ?)`)
+	n, err := insertTargets(tx, r)
 	if err != nil {
-		return 0, err
+		return n, err
 	}
-	defer insTarget.Close()
-	insEdge, err := tx.Prepare(`INSERT INTO edge (from_id, to_label, attr, in_select, nodep) VALUES (?, ?, ?, ?, ?)`)
-	if err != nil {
-		return 0, err
-	}
-	defer insEdge.Close()
-
-	insAttr, err := tx.Prepare(`INSERT INTO attribute (target_id, name, value) VALUES (?, ?, ?)`)
-	if err != nil {
-		return 0, err
-	}
-	defer insAttr.Close()
-
-	br := bufio.NewReaderSize(r, 1<<20)
-	for {
-		t := &bpb.Target{}
-		if err := protodelim.UnmarshalFrom(br, t); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return n, fmt.Errorf("reading target %d: %w", n+1, err)
-		}
-		label, kind, ruleClass, location, edges := describe(t)
-		if label == "" {
-			continue
-		}
-		pkg, name := splitLabel(label)
-		res, err := insTarget.Exec(label, kind, pkg, name, nullable(ruleClass), nullable(location))
-		if err != nil {
-			return n, fmt.Errorf("inserting %s: %w", label, err)
-		}
-		id, err := res.LastInsertId()
-		if err != nil {
-			return n, err
-		}
-		for _, e := range edges {
-			if _, err := insEdge.Exec(id, e.to, e.attr, b2i(e.inSelect), b2i(e.nodep)); err != nil {
-				return n, fmt.Errorf("inserting edge %s -> %s: %w", label, e.to, err)
-			}
-		}
-		for _, a := range ruleAttrs(t.GetRule()) {
-			if _, err := insAttr.Exec(id, a.name, a.value); err != nil {
-				return n, fmt.Errorf("inserting attribute %s of %s: %w", a.name, label, err)
-			}
-		}
-		n++
-	}
-
 	if _, err := tx.Exec(`UPDATE edge SET to_id = (SELECT id FROM target WHERE target.label = edge.to_label)`); err != nil {
 		return n, err
 	}
 	return n, tx.Commit()
 }
 
-// describe extracts the interesting parts of a Target.
-func describe(t *bpb.Target) (label, kind, ruleClass, location string, edges []edge) {
+// insertTargets writes every target read from r, with its edges and
+// attributes, and returns how many it wrote.
+func insertTargets(tx *sql.Tx, r io.Reader) (int, error) {
+	w, err := newWriter(tx)
+	if err != nil {
+		return 0, err
+	}
+	defer w.close()
+
+	n := 0
+	br := bufio.NewReaderSize(r, 1<<20)
+	for {
+		t := &bpb.Target{}
+		if err := protodelim.UnmarshalFrom(br, t); err != nil {
+			if errors.Is(err, io.EOF) {
+				return n, nil
+			}
+			return n, fmt.Errorf("reading target %d: %w", n+1, err)
+		}
+		tg, ok := describe(t)
+		if !ok || tg.label == "" {
+			continue
+		}
+		if err := w.write(tg, t.GetRule()); err != nil {
+			return n, err
+		}
+		n++
+	}
+}
+
+// writer holds the prepared statements that insert one target.
+type writer struct {
+	target, edge, attribute *sql.Stmt
+}
+
+func newWriter(tx *sql.Tx) (*writer, error) {
+	w := &writer{}
+	var err error
+	if w.target, err = tx.Prepare(`INSERT INTO target (label, kind, package, name, rule_class, location) VALUES (?, ?, ?, ?, ?, ?)`); err != nil {
+		return nil, err
+	}
+	if w.edge, err = tx.Prepare(`INSERT INTO edge (from_id, to_label, attr, in_select, nodep) VALUES (?, ?, ?, ?, ?)`); err != nil {
+		w.close()
+		return nil, err
+	}
+	if w.attribute, err = tx.Prepare(`INSERT INTO attribute (target_id, name, value) VALUES (?, ?, ?)`); err != nil {
+		w.close()
+		return nil, err
+	}
+	return w, nil
+}
+
+func (w *writer) close() {
+	for _, st := range []*sql.Stmt{w.target, w.edge, w.attribute} {
+		if st != nil {
+			st.Close()
+		}
+	}
+}
+
+// write inserts tg, its edges, and the attributes of rule, which is nil unless
+// tg is a rule.
+func (w *writer) write(tg target, rule *bpb.Rule) error {
+	pkg, name := splitLabel(tg.label)
+	res, err := w.target.Exec(tg.label, tg.kind, pkg, name, nullable(tg.ruleClass), nullable(tg.location))
+	if err != nil {
+		return fmt.Errorf("inserting %s: %w", tg.label, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	for _, e := range tg.edges {
+		if _, err := w.edge.Exec(id, e.to, e.attr, b2i(e.inSelect), b2i(e.nodep)); err != nil {
+			return fmt.Errorf("inserting edge %s -> %s: %w", tg.label, e.to, err)
+		}
+	}
+	for _, a := range ruleAttrs(rule) {
+		if _, err := w.attribute.Exec(id, a.name, a.value); err != nil {
+			return fmt.Errorf("inserting attribute %s of %s: %w", a.name, tg.label, err)
+		}
+	}
+	return nil
+}
+
+// describe extracts the interesting parts of a Target. It reports false for
+// target types that are not stored.
+func describe(t *bpb.Target) (target, bool) {
 	switch t.GetType() {
 	case bpb.Target_RULE:
 		r := t.GetRule()
-		return r.GetName(), "rule", r.GetRuleClass(), r.GetLocation(), ruleEdges(r)
+		return target{label: r.GetName(), kind: "rule", ruleClass: r.GetRuleClass(),
+			location: r.GetLocation(), edges: ruleEdges(r)}, true
 	case bpb.Target_SOURCE_FILE:
 		s := t.GetSourceFile()
-		return s.GetName(), "source_file", "", s.GetLocation(), nil
+		return target{label: s.GetName(), kind: "source_file", location: s.GetLocation()}, true
 	case bpb.Target_GENERATED_FILE:
 		g := t.GetGeneratedFile()
-		return g.GetName(), "generated_file", "", g.GetLocation(),
-			[]edge{{to: g.GetGeneratingRule(), attr: attrGeneratingRule}}
+		return target{label: g.GetName(), kind: "generated_file", location: g.GetLocation(),
+			edges: []edge{{to: g.GetGeneratingRule(), attr: attrGeneratingRule}}}, true
 	case bpb.Target_PACKAGE_GROUP:
-		return t.GetPackageGroup().GetName(), "package_group", "", "", nil
+		return target{label: t.GetPackageGroup().GetName(), kind: "package_group"}, true
 	case bpb.Target_ENVIRONMENT_GROUP:
-		return t.GetEnvironmentGroup().GetName(), "environment_group", "", "", nil
+		return target{label: t.GetEnvironmentGroup().GetName(), kind: "environment_group"}, true
 	}
-	return "", "", "", "", nil
+	return target{}, false
 }
 
 // ruleEdges returns a rule's dependencies, without duplicates. It makes two
