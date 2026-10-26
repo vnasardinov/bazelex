@@ -227,7 +227,8 @@ func ruleAttrs(r *bpb.Rule) []attr {
 	var out []attr
 	for _, a := range r.GetAttribute() {
 		name := a.GetName()
-		if name == "name" || (name != "visibility" && !a.GetExplicitlySpecified()) {
+		keep := name == "visibility" || a.GetExplicitlySpecified()
+		if name == "name" || !keep {
 			continue
 		}
 		add := func(vs ...string) {
@@ -235,6 +236,8 @@ func ruleAttrs(r *bpb.Rule) []attr {
 				out = append(out, attr{name, v})
 			}
 		}
+		// A select() attribute has type SELECTOR_LIST, which no case below
+		// handles, so its values are skipped.
 		switch a.GetType() {
 		case bpb.Attribute_STRING:
 			add(a.GetStringValue())
@@ -261,6 +264,8 @@ func ruleAttrs(r *bpb.Rule) []attr {
 				}
 			}
 		case bpb.Attribute_LABEL_LIST:
+			// Visibility is the one label list kept as plain strings, because
+			// its entries are package specs, not dependencies.
 			if name == "visibility" {
 				add(a.GetStringListValue()...)
 			}

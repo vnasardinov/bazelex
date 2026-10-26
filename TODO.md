@@ -42,19 +42,12 @@ The figures are from running bazelex over the
 
 ## Code comprehension
 
-Candidates for rewrites that make the code easier to read, mostly by
-adding or sharpening beacons (in Ruven Brooks's sense: recognizable
-names, idioms and shapes that let a reader confirm what code does without
-reading every line). Listed in the order I'd tackle them.
+Rewrites that would make the code easier to read, mostly by adding or
+sharpening beacons (in Ruven Brooks's sense: recognizable names, idioms
+and shapes that let a reader confirm what code does without reading
+every line).
 
 -   **`queryView` state** (`internal/ui/server.go`). The state of a
     query is spread across `Ran`, `Skipped`, `Err` and an empty `Rows`,
     so the template has to know which combinations are possible.
     Consider a single `State` field that the template switches on.
--   **`ruleAttrs`** (`internal/graphdb/load.go`). The skip condition
-    `name == "name" || (name != "visibility" && !explicit)` is a
-    double negative. Name it, e.g.
-    `keep := name == "visibility" || explicit`. The "select() values are
-    skipped" rule holds only because no case handles selectors, so state
-    it where the switch is. Comment why `LABEL_LIST` is handled for
-    `visibility` alone.
