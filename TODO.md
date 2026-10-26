@@ -47,29 +47,10 @@ adding or sharpening beacons (in Ruven Brooks's sense: recognizable
 names, idioms and shapes that let a reader confirm what code does without
 reading every line). Listed in the order I'd tackle them.
 
--   **`ruleEdges` and `labelsOf`** (`internal/graphdb/load.go`).
-    `labelsOf` takes six positional parameters, and both call sites
-    unpack the same five getters by hand, once from an `Attribute` and
-    once from a `SelectorEntry`. The `emit` closure is rebuilt on every
-    iteration and writes to `covered` as a side effect that the later
-    implicit-edge pass depends on. `typ` is recomputed in the innermost
-    loop. Define a small interface with the five getters (both messages
-    already satisfy it) and pass that to `labelsOf`. Split the function
-    into an attribute pass and an implicit-edge pass, and rename
-    `covered` to say what it holds (labels some attribute already
-    declares).
 -   **`queryView` state** (`internal/ui/server.go`). The state of a
     query is spread across `Ran`, `Skipped`, `Err` and an empty `Rows`,
     so the template has to know which combinations are possible.
     Consider a single `State` field that the template switches on.
--   **`run`** (`internal/ui/server.go`). The probe-row trick (skip
-    `skip` rows, then a row beyond `pageRows` means a next page exists)
-    is the key idea and has no name or comment. The named result
-    `hasNext` is returned by bare `return` on four error paths that each
-    set `v.Err` first. Row scanning and the cell type switch are inlined
-    in the loop. Extract `scanRow` and `cellFor`, comment the probe row,
-    and return `(hasNext bool, err error)`, setting `v.Err` in one place
-    in the caller.
 -   **`Load` and `describe`** (`internal/graphdb/load.go`). `describe`
     returns five positional values with runs of `""`, and `label == ""`
     doubles as "unrecognized type, skip". `Load` combines a named `err`,

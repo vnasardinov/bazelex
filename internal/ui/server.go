@@ -106,7 +106,10 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		case q.Expensive && !requested[q.ID]:
 			v.Skipped = true
 		default:
-			hasNext := s.run(r.Context(), &v)
+			hasNext, err := s.run(r.Context(), &v)
+			if err != nil {
+				v.Err = err.Error()
+			}
 			v.addRowLinks(params)
 			v.markNumericColumns()
 			v.paginate(params, hasNext)
@@ -187,8 +190,9 @@ func pageURL(params url.Values, id string, page int) string {
 }
 
 // run executes v's query and fills in the result fields with the rows of page
-// v.Page. It reports whether there are more rows after that page.
-func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
+// v.Page. It reports whether there are more rows after that page. On error,
+// the rows read so far are kept.
+func (s *server) run(ctx context.Context, v *queryView) (hasNext bool, err error) {
 	v.Ran = true
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
@@ -199,52 +203,63 @@ func (s *server) run(ctx context.Context, v *queryView) (hasNext bool) {
 	}
 	rows, err := s.db.QueryContext(ctx, v.SQL, args...)
 	if err != nil {
-		v.Err = err.Error()
-		return
+		return false, err
 	}
 	defer rows.Close()
 	if v.Columns, err = rows.Columns(); err != nil {
-		v.Err = err.Error()
-		return
+		return false, err
 	}
+
 	skip := (v.Page - 1) * s.pageRows
 	for rows.Next() {
 		if skip > 0 {
 			skip--
 			continue
 		}
+		// The page is full, so this row is the probe: its existence is the
+		// only thing we need from it.
 		if len(v.Rows) == s.pageRows {
-			return true
+			return true, nil
 		}
-		vals := make([]any, len(v.Columns))
-		ptrs := make([]any, len(vals))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
-			v.Err = err.Error()
-			return
-		}
-		row := make([]cell, len(vals))
-		for i, x := range vals {
-			switch x := x.(type) {
-			case nil:
-				row[i].Text = "NULL"
-			case []byte:
-				row[i].Text = string(x)
-			case int64, float64:
-				row[i].Text = fmt.Sprint(x)
-				row[i].Num = true
-			default:
-				row[i].Text = fmt.Sprint(x)
-			}
+		row, err := scanRow(rows, len(v.Columns))
+		if err != nil {
+			return false, err
 		}
 		v.Rows = append(v.Rows, row)
 	}
-	if err := rows.Err(); err != nil {
-		v.Err = err.Error()
+	return false, rows.Err()
+}
+
+// scanRow reads the current row of rows, which has n columns.
+func scanRow(rows *sql.Rows, n int) ([]cell, error) {
+	vals := make([]any, n)
+	ptrs := make([]any, n)
+	for i := range vals {
+		ptrs[i] = &vals[i]
 	}
-	return false
+	if err := rows.Scan(ptrs...); err != nil {
+		return nil, err
+	}
+	row := make([]cell, n)
+	for i, x := range vals {
+		row[i] = cellFor(x)
+	}
+	return row, nil
+}
+
+// cellFor formats a value scanned from the database. Numbers are marked so
+// they are right-aligned.
+func cellFor(x any) cell {
+	switch x := x.(type) {
+	case nil:
+		return cell{Text: "NULL"}
+	case []byte:
+		return cell{Text: string(x)}
+	case int64, float64:
+		return cell{Text: fmt.Sprint(x), Num: true}
+	default:
+		return cell{Text: fmt.Sprint(x)}
+	}
 }
 
 // ruleLabels returns rule labels for input autocompletion. Failure only costs
