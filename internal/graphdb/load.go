@@ -127,9 +127,9 @@ func describe(t *bpb.Target) (label, kind, ruleClass, location string, edges []e
 	return "", "", "", "", nil
 }
 
-// ruleEdges collects a rule's dependencies from its label-typed attributes,
-// including every branch of select(), and then adds any rule inputs that no
-// attribute accounts for (implicit dependencies).
+// ruleEdges returns a rule's dependencies, without duplicates. It makes two
+// passes: first the edges from label-typed attributes, then an implicit edge
+// for each rule input that no attribute declared.
 func ruleEdges(r *bpb.Rule) []edge {
 	seen := map[edge]bool{}
 	var edges []edge
@@ -140,32 +140,40 @@ func ruleEdges(r *bpb.Rule) []edge {
 		}
 	}
 
-	covered := map[string]bool{}
+	declared := map[string]bool{} // labels some attribute accounts for
 	for _, a := range r.GetAttribute() {
-		nodep := a.GetNodep()
-		emit := func(attr string, inSelect bool, labels []string) {
-			for _, l := range labels {
-				covered[l] = true
-				add(edge{to: l, attr: attr, inSelect: inSelect, nodep: nodep})
-			}
-		}
-		emit(a.GetName(), false, labelsOf(a.GetType(), a.GetStringValue(), a.GetStringListValue(),
-			a.GetLabelDictUnaryValue(), a.GetLabelListDictValue(), a.GetLabelKeyedStringDictValue()))
-
-		for _, sel := range a.GetSelectorList().GetElements() {
-			typ := a.GetSelectorList().GetType()
-			for _, ent := range sel.GetEntries() {
-				if !ent.GetIsDefaultValue() && ent.GetLabel() != "" {
-					emit(attrSelectCond, true, []string{ent.GetLabel()})
-				}
-				emit(a.GetName(), true, labelsOf(typ, ent.GetStringValue(), ent.GetStringListValue(),
-					ent.GetLabelDictUnaryValue(), ent.GetLabelListDictValue(), ent.GetLabelKeyedStringDictValue()))
-			}
+		for _, e := range attributeEdges(a) {
+			declared[e.to] = true
+			add(e)
 		}
 	}
 	for _, in := range r.GetRuleInput() {
-		if !covered[in] {
+		if !declared[in] {
 			add(edge{to: in, attr: attrImplicit})
+		}
+	}
+	return edges
+}
+
+// attributeEdges returns the edges from one attribute: those of its plain
+// value, and those of every branch of its select(), if it has one.
+func attributeEdges(a *bpb.Attribute) []edge {
+	var edges []edge
+	emit := func(attr string, inSelect bool, labels []string) {
+		for _, l := range labels {
+			edges = append(edges, edge{to: l, attr: attr, inSelect: inSelect, nodep: a.GetNodep()})
+		}
+	}
+
+	emit(a.GetName(), false, labelsOf(a.GetType(), a))
+
+	selectors := a.GetSelectorList()
+	for _, sel := range selectors.GetElements() {
+		for _, ent := range sel.GetEntries() {
+			if !ent.GetIsDefaultValue() && ent.GetLabel() != "" {
+				emit(attrSelectCond, true, []string{ent.GetLabel()})
+			}
+			emit(a.GetName(), true, labelsOf(selectors.GetType(), ent))
 		}
 	}
 	return edges
@@ -220,30 +228,39 @@ func ruleAttrs(r *bpb.Rule) []attr {
 	return out
 }
 
-// labelsOf returns the labels held by an attribute value (or select entry) of
-// the given type, or nil if the type does not hold labels.
-func labelsOf(t bpb.Attribute_Discriminator, s string, list []string,
-	unary []*bpb.LabelDictUnaryEntry, listDict []*bpb.LabelListDictEntry, keyed []*bpb.LabelKeyedStringDictEntry) []string {
+// attrValue is the set of value getters that a bpb.Attribute and each entry of
+// its select() have in common. Which one holds the value depends on the type.
+type attrValue interface {
+	GetStringValue() string
+	GetStringListValue() []string
+	GetLabelDictUnaryValue() []*bpb.LabelDictUnaryEntry
+	GetLabelListDictValue() []*bpb.LabelListDictEntry
+	GetLabelKeyedStringDictValue() []*bpb.LabelKeyedStringDictEntry
+}
+
+// labelsOf returns the labels held by v, an attribute value or select entry of
+// type t, or nil if t does not hold labels.
+func labelsOf(t bpb.Attribute_Discriminator, v attrValue) []string {
 	switch t {
 	case bpb.Attribute_LABEL:
-		return []string{s}
+		return []string{v.GetStringValue()}
 	case bpb.Attribute_LABEL_LIST:
-		return list
+		return v.GetStringListValue()
 	case bpb.Attribute_LABEL_DICT_UNARY:
 		var out []string
-		for _, e := range unary {
+		for _, e := range v.GetLabelDictUnaryValue() {
 			out = append(out, e.GetValue())
 		}
 		return out
 	case bpb.Attribute_LABEL_LIST_DICT:
 		var out []string
-		for _, e := range listDict {
+		for _, e := range v.GetLabelListDictValue() {
 			out = append(out, e.GetValue()...)
 		}
 		return out
 	case bpb.Attribute_LABEL_KEYED_STRING_DICT:
 		var out []string
-		for _, e := range keyed {
+		for _, e := range v.GetLabelKeyedStringDictValue() {
 			out = append(out, e.GetKey())
 		}
 		return out
