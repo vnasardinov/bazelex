@@ -298,3 +298,34 @@ func TestPackageCoupling(t *testing.T) {
 		t.Error("z is not in the cycle")
 	}
 }
+
+func TestFragment(t *testing.T) {
+	path := testDB(t)
+	body := get(t, path, "/q/manual-rules")
+	if strings.Contains(body, "<section") || !strings.Contains(body, "//p:a") {
+		t.Errorf("want just the result table with //p:a, got %q", body)
+	}
+	// An expensive query that wasn't requested offers a link that keeps the
+	// URL's other parameters.
+	body = get(t, path, "/q/heaviest?x=1")
+	if !strings.Contains(body, `href="?run=heaviest&amp;x=1#heaviest"`) && !strings.Contains(body, `href="?x=1&amp;run=heaviest#heaviest"`) {
+		t.Errorf("missing run link: %q", body)
+	}
+	body = get(t, path, "/q/heaviest?run=heaviest")
+	if strings.Contains(body, "Run this query") {
+		t.Errorf("requested query still skipped: %q", body)
+	}
+}
+
+func TestFragmentUnknown(t *testing.T) {
+	db, err := sql.Open("sqlite", "file:"+testDB(t)+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	w := httptest.NewRecorder()
+	NewServer(db, "g", 20, time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/q/nope", nil))
+	if w.Code != 404 {
+		t.Errorf("status %d, want 404", w.Code)
+	}
+}

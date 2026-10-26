@@ -39,6 +39,7 @@ func NewServer(db *sql.DB, dbName string, pageRows int, timeout time.Duration) h
 	s := &server{db: db, dbName: dbName, pageRows: pageRows, timeout: timeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
+	mux.HandleFunc("GET /q/{id}", s.fragment)
 	return mux
 }
 
@@ -71,6 +72,7 @@ type queryView struct {
 	NextURL  string
 	// Skipped is set for an expensive query that wasn't requested.
 	Skipped bool
+	RunURL  string // link that runs a skipped query
 }
 
 type pageData struct {
@@ -85,35 +87,8 @@ type pageData struct {
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	page := pageData{DB: s.dbName, Limit: s.pageRows, Labels: s.ruleLabels(r.Context())}
-	requested := map[string]bool{}
-	for _, id := range params["run"] {
-		requested[id] = true
-	}
 	for _, q := range queries {
-		v := queryView{Query: q, Values: map[string]string{}, Limit: s.pageRows, Page: 1}
-		if n, err := strconv.Atoi(params.Get(q.ID + ".page")); err == nil && n > 1 {
-			v.Page = n
-		}
-		complete := true
-		for _, p := range q.Params {
-			val := strings.TrimSpace(params.Get(q.ID + "." + p.Name))
-			v.Values[p.Name] = val
-			complete = complete && val != ""
-		}
-		switch {
-		case !complete:
-			// Some input is missing, so show the form and nothing else.
-		case q.Expensive && !requested[q.ID]:
-			v.Skipped = true
-		default:
-			hasNext, err := s.run(r.Context(), &v)
-			if err != nil {
-				v.Err = err.Error()
-			}
-			v.addRowLinks(params)
-			v.markNumericColumns()
-			v.paginate(params, hasNext)
-		}
+		v := s.view(r.Context(), q, params)
 		if q.selfContained() {
 			page.SelfContained = append(page.SelfContained, v)
 		} else {
@@ -123,6 +98,55 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	if err := indexTmpl.Execute(w, page); err != nil {
 		log.Printf("render: %v", err)
 	}
+}
+
+// fragment serves the inner part of one query's section, so that script can
+// refresh a single query without reloading the page. It takes the same URL
+// parameters as the page.
+func (s *server) fragment(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	i := slices.IndexFunc(queries, func(q Query) bool { return q.ID == id })
+	if i < 0 {
+		http.NotFound(w, r)
+		return
+	}
+	v := s.view(r.Context(), queries[i], r.URL.Query())
+	if err := indexTmpl.ExecuteTemplate(w, "inner", v); err != nil {
+		log.Printf("render: %v", err)
+	}
+}
+
+// view builds the view of q for the given URL parameters, running the query
+// unless it is incomplete or expensive and not requested.
+func (s *server) view(ctx context.Context, q Query, params url.Values) queryView {
+	v := queryView{Query: q, Values: map[string]string{}, Limit: s.pageRows, Page: 1}
+	if n, err := strconv.Atoi(params.Get(q.ID + ".page")); err == nil && n > 1 {
+		v.Page = n
+	}
+	complete := true
+	for _, p := range q.Params {
+		val := strings.TrimSpace(params.Get(q.ID + "." + p.Name))
+		v.Values[p.Name] = val
+		complete = complete && val != ""
+	}
+	switch {
+	case !complete:
+		// Some input is missing, so show the form and nothing else.
+	case q.Expensive && !slices.Contains(params["run"], q.ID):
+		v.Skipped = true
+		p := maps.Clone(params)
+		p.Add("run", q.ID)
+		v.RunURL = "?" + p.Encode() + "#" + q.ID
+	default:
+		hasNext, err := s.run(ctx, &v)
+		if err != nil {
+			v.Err = err.Error()
+		}
+		v.addRowLinks(params)
+		v.markNumericColumns()
+		v.paginate(params, hasNext)
+	}
+	return v
 }
 
 // paginate sets the row range shown and the links to the neighbouring pages.
