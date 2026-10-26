@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -82,38 +83,33 @@ type pageData struct {
 }
 
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
 	page := pageData{DB: s.dbName, Limit: s.pageRows, Labels: s.ruleLabels(r.Context())}
 	requested := map[string]bool{}
-	for _, id := range r.URL.Query()["run"] {
+	for _, id := range params["run"] {
 		requested[id] = true
 	}
 	for _, q := range queries {
 		v := queryView{Query: q, Values: map[string]string{}, Limit: s.pageRows, Page: 1}
-		if n, err := strconv.Atoi(r.URL.Query().Get(q.ID + ".page")); err == nil && n > 1 {
+		if n, err := strconv.Atoi(params.Get(q.ID + ".page")); err == nil && n > 1 {
 			v.Page = n
 		}
 		complete := true
 		for _, p := range q.Params {
-			val := strings.TrimSpace(r.URL.Query().Get(q.ID + "." + p.Name))
+			val := strings.TrimSpace(params.Get(q.ID + "." + p.Name))
 			v.Values[p.Name] = val
 			complete = complete && val != ""
 		}
 		switch {
 		case !complete:
+			// Some input is missing, so show the form and nothing else.
 		case q.Expensive && !requested[q.ID]:
 			v.Skipped = true
 		default:
 			hasNext := s.run(r.Context(), &v)
-			v.addRowLinks(r.URL.Query())
+			v.addRowLinks(params)
 			v.markNumericColumns()
-			v.FirstRow = (v.Page-1)*s.pageRows + 1
-			v.LastRow = v.FirstRow + len(v.Rows) - 1
-			if v.Page > 1 {
-				v.PrevURL = pageURL(r.URL.Query(), q.ID, v.Page-1)
-			}
-			if hasNext {
-				v.NextURL = pageURL(r.URL.Query(), q.ID, v.Page+1)
-			}
+			v.paginate(params, hasNext)
 		}
 		if q.selfContained() {
 			page.SelfContained = append(page.SelfContained, v)
@@ -123,6 +119,19 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := indexTmpl.Execute(w, page); err != nil {
 		log.Printf("render: %v", err)
+	}
+}
+
+// paginate sets the row range shown and the links to the neighbouring pages.
+// hasNext says whether there are rows after the current page.
+func (v *queryView) paginate(params url.Values, hasNext bool) {
+	v.FirstRow = (v.Page-1)*v.Limit + 1
+	v.LastRow = v.FirstRow + len(v.Rows) - 1
+	if v.Page > 1 {
+		v.PrevURL = pageURL(params, v.ID, v.Page-1)
+	}
+	if hasNext {
+		v.NextURL = pageURL(params, v.ID, v.Page+1)
 	}
 }
 
@@ -147,12 +156,8 @@ func (v *queryView) addRowLinks(params url.Values) {
 		return
 	}
 	if v.RowLink.NewTab {
-		p := url.Values{}
-		for k, vs := range params {
-			p[k] = vs
-		}
-		p.Del("run")
-		params = p
+		params = maps.Clone(params)
+		delete(params, "run")
 	}
 	for _, row := range v.Rows {
 		row[col].URL = linkURL(params, v.RowLink.ToQuery, v.RowLink.ToParam, row[col].Text)
@@ -163,10 +168,7 @@ func (v *queryView) addRowLinks(params url.Values) {
 // linkURL returns a link that opens query id with its parameter set to value,
 // at its first page, keeping the rest of the current URL's parameters.
 func linkURL(params url.Values, id, param, value string) string {
-	p := url.Values{}
-	for k, vs := range params {
-		p[k] = vs
-	}
+	p := maps.Clone(params)
 	p.Set(id+"."+param, value)
 	p.Del(id + ".page")
 	return "?" + p.Encode() + "#" + id
@@ -175,10 +177,7 @@ func linkURL(params url.Values, id, param, value string) string {
 // pageURL returns a link to the given page of query id that keeps the rest of
 // the current URL's parameters.
 func pageURL(params url.Values, id string, page int) string {
-	p := url.Values{}
-	for k, vs := range params {
-		p[k] = vs
-	}
+	p := maps.Clone(params)
 	if page > 1 {
 		p.Set(id+".page", strconv.Itoa(page))
 	} else {

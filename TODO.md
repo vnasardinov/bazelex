@@ -58,16 +58,10 @@ reading every line). Listed in the order I'd tackle them.
     into an attribute pass and an implicit-edge pass, and rename
     `covered` to say what it holds (labels some attribute already
     declares).
--   **`index` and the URL helpers** (`internal/ui/server.go`). `index`
-    mixes page parsing, param parsing, the decision to run and
-    pagination in about 40 lines. The `switch` has an empty
-    `case !complete:` that means "show the form only" and reads like a
-    bug. The state of a query is spread across `Ran`, `Skipped`, `Err`
-    and an empty `Rows`. The `url.Values` copy loop is inlined three
-    times (`addRowLinks`, `linkURL`, `pageURL`), and `r.URL.Query()` is
-    re-parsed throughout. Parse once, extract `cloneValues`, make the
-    empty case explicit or commented, and move the pagination
-    arithmetic into one method.
+-   **`queryView` state** (`internal/ui/server.go`). The state of a
+    query is spread across `Ran`, `Skipped`, `Err` and an empty `Rows`,
+    so the template has to know which combinations are possible.
+    Consider a single `State` field that the template switches on.
 -   **`run`** (`internal/ui/server.go`). The probe-row trick (skip
     `skip` rows, then a row beyond `pageRows` means a next page exists)
     is the key idea and has no name or comment. The named result
