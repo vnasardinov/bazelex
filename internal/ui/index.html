@@ -97,57 +97,55 @@
 </form>
 </main>
 </div>
-<script>
+<script type="module">
 // Progressive enhancement: refresh one query's result in place instead of
 // reloading the page. Without script, the links and form still work.
-(function () {
-  function refresh(id, search, fallback) {
-    var body = document.querySelector('.body[data-query="' + id + '"]');
-    body.classList.add('loading');
-    fetch('q/' + id + search)
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
-      .then(function (html) {
-        body.innerHTML = html;
-        history.replaceState(null, '', search || location.pathname);
-      })
-      .catch(function () { fallback(); })
-      .finally(function () { body.classList.remove('loading'); });
-  }
-  document.addEventListener('click', function (e) {
-    var a = e.target.closest && e.target.closest('.body a[href^="?"]');
-    if (!a || a.target || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    var id = a.closest('.body').dataset.query;
-    // Links to other queries are ordinary navigation.
-    if (new URL(a.href).hash !== '#' + id) return;
-    e.preventDefault();
-    refresh(id, a.search, function () { location.href = a.href; });
-  });
-  function runForm(section) {
-    var id = section.id;
-    var p = new URLSearchParams(location.search);
-    p.delete(id + '.page');
-    section.querySelectorAll('input[name^="' + id + '."]').forEach(function (i) {
-      p.set(i.name, i.value);
-    });
-    refresh(id, '?' + p.toString(), function () {
-      location.href = '?' + p.toString() + '#' + id;
-    });
-  }
-  document.addEventListener('submit', function (e) {
-    var section = e.submitter && e.submitter.closest('section');
-    if (!section) return;
-    e.preventDefault();
-    runForm(section);
-  });
-  // Enter in an input would otherwise submit via the form's first button.
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
-    var section = e.target.closest('section');
-    if (!section) return;
-    e.preventDefault();
-    runForm(section);
-  });
-})();
+const refresh = (id, search, fallback) => {
+  const body = document.querySelector(`.body[data-query="${id}"]`);
+  body.classList.add('loading');
+  fetch(`q/${id}${search}`)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(html => {
+      body.innerHTML = html;
+      history.replaceState(null, '', search || location.pathname);
+    })
+    .catch(fallback)
+    .finally(() => body.classList.remove('loading'));
+};
+
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('.body a[href^="?"]');
+  if (!a || a.target || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  const id = a.closest('.body').dataset.query;
+  // Links to other queries are ordinary navigation.
+  if (new URL(a.href).hash !== `#${id}`) return;
+  e.preventDefault();
+  refresh(id, a.search, () => { location.href = a.href; });
+});
+
+const runForm = section => {
+  const id = section.id;
+  const p = new URLSearchParams(location.search);
+  p.delete(`${id}.page`);
+  section.querySelectorAll(`input[name^="${id}."]`).forEach(i => p.set(i.name, i.value));
+  refresh(id, `?${p}`, () => { location.href = `?${p}#${id}`; });
+};
+
+document.addEventListener('submit', e => {
+  const section = e.submitter?.closest('section');
+  if (!section) return;
+  e.preventDefault();
+  runForm(section);
+});
+
+// Enter in an input would otherwise submit via the form's first button.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+  const section = e.target.closest('section');
+  if (!section) return;
+  e.preventDefault();
+  runForm(section);
+});
 </script>
 </body>
 </html>

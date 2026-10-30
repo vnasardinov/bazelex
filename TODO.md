@@ -55,10 +55,6 @@ The figures are from running bazelex over the
 
     See also [Quotienting](#Quotienting) below.
 
--   Rewrite the `<script>` in `internal/ui/index.html` in modern
-    JavaScript, with arrow functions instead of anonymous `function` and
-    with `const/let` instead of `var`.
-
 -   In `internal/ui/index.html`, if two refreshes for the same section
     overlap (the user clicks twice quickly), nothing here cancels the
     first. Whichever response arrives last wins, and the earlier
