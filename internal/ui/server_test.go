@@ -291,7 +291,7 @@ func TestPackageCoupling(t *testing.T) {
 		t.Error("an edge within one package is not coupling")
 	}
 	body = get(t, path, "/?run=package-cycles")
-	if !strings.Contains(body, `<td>x</td><td class="num">2</td><td>x, y</td>`) {
+	if !strings.Contains(body, `<td><a href="graph?cycle=1&amp;depth=1&amp;pkg=x" target="_blank" rel="noopener">x</a></td><td class="num">2</td><td>x, y</td>`) {
 		t.Errorf("package-cycles missing:\n%s", body)
 	}
 	if strings.Contains(body, "z</td>") && strings.Contains(body, "x, y, z") {

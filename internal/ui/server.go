@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,9 @@ type server struct {
 	dbName   string
 	pageRows int           // rows shown per page
 	timeout  time.Duration // limit on each query
+
+	pkgMu sync.Mutex
+	pkgs  *pkgGraph // loaded on first use
 }
 
 // NewServer returns a handler serving the page for db. dbName is shown in the
@@ -40,6 +44,7 @@ func NewServer(db *sql.DB, dbName string, pageRows int, timeout time.Duration) h
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /q/{id}", s.fragment)
+	mux.HandleFunc("GET /graph", s.graph)
 	return mux
 }
 
@@ -175,6 +180,14 @@ func (v *queryView) markNumericColumns() {
 
 // addRowLinks turns the values of v's RowLink column into links.
 func (v *queryView) addRowLinks(params url.Values) {
+	if v.GraphColumn != "" {
+		if col := slices.Index(v.Columns, v.GraphColumn); col >= 0 {
+			for _, row := range v.Rows {
+				row[col].URL = graphURL(row[col].Text, defaultDepth, true)
+				row[col].NewTab = true
+			}
+		}
+	}
 	if v.RowLink == nil {
 		return
 	}

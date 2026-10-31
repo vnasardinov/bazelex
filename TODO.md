@@ -49,12 +49,6 @@ The figures are from running bazelex over the
     pool works as long as the database is opened read-only (or in WAL
     mode).
 
--   **Graph view.** Collapse the target graph by package and draw the
-    quotient graph. If that is still too large, let the user pick a
-    package and draw its neighbors out to a chosen depth.
-
-    See also [Quotienting](#Quotienting) below.
-
 -   In `internal/ui/index.html`, if two refreshes for the same section
     overlap (the user clicks twice quickly), nothing here cancels the
     first. Whichever response arrives last wins, and the earlier

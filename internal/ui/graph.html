@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{if .HasPkg}}{{.Pkg}} &ndash; {{end}}bazelex graph</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 2em auto; padding: 0 1em; max-width: 100em; }
+  input[type=text] { width: 30em; font-family: monospace; }
+  label { margin-right: 1em; }
+  .err { color: #b00; white-space: pre-wrap; }
+  .note { color: #666; }
+  .graph { overflow: auto; border: 1px solid #ccc; border-radius: 6px; padding: .5em; }
+  .graph svg { max-width: 100%; height: auto; }
+  .graph a:hover polygon { stroke: #00f; }
+</style>
+</head>
+<body>
+<p><a href=".">&larr; bazelex</a></p>
+<h1>Package graph</h1>
+<p class="note">Rule dependencies collapsed by package, from <code>{{.DB}}</code>. A thicker edge stands for more
+rule-to-rule dependencies; hover over it for the count. Click a package to center the graph on it.</p>
+<form method="get" action="graph">
+  <label>Package <input type="text" name="pkg" value="{{.Pkg}}" placeholder="comp/core/workloadmeta"></label>
+  <label>Depth <input type="number" name="depth" min="0" max="{{.MaxDepth}}" value="{{.Depth}}" style="width:4em"></label>
+  <label><input type="checkbox" name="cycle" value="1"{{if .Cycle}} checked{{end}}> Center on the whole dependency cycle</label>
+  <button type="submit">Draw</button>
+</form>
+{{if .Err}}<p class="err">{{.Err}}</p>
+{{else if .HasPkg}}
+<p class="note">{{.Nodes}} packages{{if gt .CycleSize 1}}; <code>{{.Pkg}}</code> is in a dependency cycle of {{.CycleSize}} packages (red){{end}}.
+Gold is the center.</p>
+{{if .Notice}}<p class="note">{{.Notice}}</p>{{end}}
+<div class="graph">{{.SVG}}</div>
+{{end}}
+</body>
+</html>

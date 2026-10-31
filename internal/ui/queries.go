@@ -18,7 +18,10 @@ type Query struct {
 	Expensive bool
 	// RowLink, if set, turns a column of the results into links to another query.
 	RowLink *RowLink
-	SQL     string
+	// GraphColumn, if set, names a column of package names that become links to
+	// the package graph page, centered on the package's dependency cycle.
+	GraphColumn string
+	SQL         string
 }
 
 // RowLink makes each value in Column a link that opens the query ToQuery with
@@ -140,6 +143,7 @@ ORDER BY edges + back_edges DESC, edges DESC, a.from_pkg, a.to_pkg;`,
 		Title:       "Package dependency cycles",
 		Description: "Groups of packages that depend on each other, directly or through other packages. Bazel allows this between packages as long as no rules form a cycle, but it makes the packages impossible to layer. This computes the reachability closure over packages, so it can be slow on large graphs.",
 		Expensive:   true,
+		GraphColumn: "comp",
 		SQL: `WITH RECURSIVE
   pkg_dep(a, b) AS (
     SELECT DISTINCT f.package, t.package

@@ -88,6 +88,14 @@ links for longer results. The page has two sections:
   down to the target. Ties are broken the same way every time, so only one
   chain is shown.
 
+Each package in the "Package dependency cycles" results links to a graph page
+(`/graph?pkg=...&depth=N`), which draws the rule dependencies collapsed by
+package, out to `depth` edges from the package (or from its whole dependency
+cycle, shown in red). Click a package in the drawing to re-center on it. At most
+60 packages are drawn. The drawing is Graphviz, built into the binary; see
+[docs/graph-rendering.md](docs/graph-rendering.md) for why and for the
+alternatives.
+
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite
 ```
