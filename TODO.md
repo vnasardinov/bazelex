@@ -56,6 +56,56 @@ The figures are from running bazelex over the
     later one is still in flight. For this use it's probably acceptable,
     but an `AbortController` would tighten it up.
 
+### Review findings for the package graph page
+
+From a code review of commit 4789c12 ("ui: add a package graph page"),
+most severe first. All line numbers are in `internal/ui/graph.go` as of
+that commit; use `git show 4789c12:internal/ui/graph.go` to see the code
+they refer to, and `git log -L` or `git blame` to follow it since.
+
+-   **No time bound on rendering** (line 312, `fillGraph`
+    calling `renderSVG`). The query path wraps its work in `s.timeout`, but
+    `fillGraph` passes `r.Context()` straight through. The cap is on
+    nodes (60), not edges, so a dense neighborhood can have about 3,500
+    edges, and the layout can run for minutes (the file's own comment
+    says 90 seconds). Concurrent requests each run their own WASM layout
+    with no limit. Apply `s.timeout` and consider limiting concurrency.
+-   **New Graphviz instance per request** (line 189, `renderSVG`).
+    `graphviz.New(ctx)` creates and compiles a wazero runtime each time:
+    hundreds of milliseconds and tens of MB, paid again on every click
+    on a node link. Create it once, guard it with a mutex, and reuse it.
+-   **Cycle larger than the node cap** (lines 303-306, `fillGraph`). With "center on
+    cycle" on and a cycle of 60 or more packages, the cap truncates the
+    centers themselves, by name order. The requested package may not be
+    drawn. The notice says to lower the depth, which cannot help, and
+    says "nearest the center" when the cut is alphabetical. Always keep
+    the requested package, and fix the notice.
+-   **`cycle` parameter parsing** (line 274, `graph`). Any non-empty value turns
+    cycle mode on, so `cycle=0` and `cycle=false` do the opposite of what
+    they say. Use `strconv.ParseBool` or compare with `"1"`.
+-   **Quadratic BFS** (line 117, neighborhood BFS). It deduplicates with
+    `slices.Contains(next, q)`, which is O(n^2), and the frontier is
+    unbounded before the 60-node cut. At depth 10 from a hub package
+    with thousands of dependents, one request burns seconds of CPU. Use
+    a set and stop expanding once the limit is reached.
+-   **Lock held across the load** (line 214, `loadPkgGraph`). `pkgMu` is
+    held for the whole `GROUP BY` query, which uses the first requester's
+    context. Other `/graph` requests block, uncancellably, for up to
+    `s.timeout`. If the first client disconnects, the query is cancelled
+    and the next request retries it. A failed load is never cached, so a
+    database that always times out is re-queried on every request. Use
+    `sync.Once` or singleflight with a detached context.
+-   **Errors returned as 200, and `pkg` not normalized** (lines 273, 290
+    and 294, `graph` and `fillGraph`). Typing `//foo/bar` or `foo/bar:all` gives "Package has no
+    dependencies", which reads as an isolated package. Real failures,
+    such as a query timeout, also return 200. Strip a leading `//` and
+    set an error status for failures.
+-   **Unverified `template.HTML` SVG** (line 208, `renderSVG`). The
+    output is marked safe on the assumption that go-graphviz escapes
+    every embedded string. Package names come from workspace data, and
+    the only test checks that the output contains `<svg`. Add a test with
+    a hostile package name, or sanitize the SVG.
+
 ## Code comprehension
 
 Rewrites that would make the code easier to read, mostly by adding or
