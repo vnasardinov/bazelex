@@ -20,7 +20,7 @@
 <p class="note">Rule dependencies collapsed by package, from <code>{{.DB}}</code>. A thicker edge stands for more
 rule-to-rule dependencies; hover over it for the count. Click a package to center the graph on it.</p>
 <form method="get" action="graph">
-  <label>Package <input type="text" name="pkg" value="{{.Pkg}}" placeholder="comp/core/workloadmeta"></label>
+  <label>Package <input type="text" name="pkg" value="{{.Pkg}}" placeholder="path/to/package"></label>
   <label>Depth <input type="number" name="depth" min="0" max="{{.MaxDepth}}" value="{{.Depth}}" style="width:4em"></label>
   <label><input type="checkbox" name="cycle" value="1"{{if .Cycle}} checked{{end}}> Center on the whole dependency cycle</label>
   <button type="submit">Draw</button>
@@ -30,6 +30,7 @@ rule-to-rule dependencies; hover over it for the count. Click a package to cente
 <p class="note">{{.Nodes}} packages{{if gt .CycleSize 1}}; <code>{{.Pkg}}</code> is in a dependency cycle of {{.CycleSize}} packages (red){{end}}.
 Gold is the center.</p>
 {{if .Notice}}<p class="note">{{.Notice}}</p>{{end}}
+<p class="note">Download: <a href="{{.DotURL}}">.dot</a> &middot; <a href="{{.SVGURL}}">.svg</a></p>
 <div class="graph">{{.SVG}}</div>
 {{end}}
 </body>

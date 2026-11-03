@@ -94,7 +94,10 @@ package, out to `depth` edges from the package (or from its whole dependency
 cycle, shown in red). Click a package in the drawing to re-center on it. At most
 60 packages are drawn. The drawing is Graphviz, built into the binary; see
 [docs/graph-rendering.md](docs/graph-rendering.md) for why and for the
-alternatives.
+alternatives. The page links to the drawing's DOT source and SVG as downloads
+(`/graph.dot` and `/graph.svg`, which take the same parameters). Because the
+database is read-only, a laid-out drawing is kept in memory (the 64 most recent),
+and asking for it again is instant.
 
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite

@@ -4,15 +4,20 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"math"
+	"mime"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/goccy/go-graphviz"
 )
@@ -183,9 +188,9 @@ func dotQuote(s string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
 }
 
-// renderSVG lays out the DOT source and returns the SVG as an element that can
-// be embedded in a page, without the XML prolog and doctype.
-func renderSVG(ctx context.Context, dot string) (template.HTML, error) {
+// renderSVG lays out the DOT source and returns the SVG element, without the
+// XML prolog and doctype, so that it can be embedded in a page or saved as is.
+func renderSVG(ctx context.Context, dot string) (string, error) {
 	g, err := graphviz.New(ctx)
 	if err != nil {
 		return "", err
@@ -204,8 +209,7 @@ func renderSVG(ctx context.Context, dot string) (template.HTML, error) {
 	if i := strings.Index(svg, "<svg"); i >= 0 {
 		svg = svg[i:]
 	}
-	// The SVG is Graphviz's own output, and every string it embeds is escaped.
-	return template.HTML(svg), nil
+	return svg, nil
 }
 
 // loadPkgGraph reads the package quotient graph from the database. The
@@ -244,72 +248,195 @@ GROUP BY f.package, t.package`)
 	return g, nil
 }
 
+// graphKey is the input of a drawing, with depth already clamped. The database
+// is read-only, so equal keys always give the same drawing.
+type graphKey struct {
+	pkg   string
+	depth int
+	cycle bool // draw the whole dependency cycle of pkg as the center
+}
+
+// query returns the key as URL query parameters.
+func (k graphKey) query() string {
+	p := url.Values{"pkg": {k.pkg}, "depth": {strconv.Itoa(k.depth)}}
+	if k.cycle {
+		p.Set("cycle", "1")
+	}
+	return p.Encode()
+}
+
+// graphURL returns the link to the graph page centered on pkg.
+func graphURL(pkg string, depth int, cycle bool) string {
+	return "graph?" + graphKey{pkg, depth, cycle}.query()
+}
+
+// parseGraphKey reads the graph parameters of r. ok is false if there is no pkg.
+func parseGraphKey(r *http.Request) (k graphKey, ok bool) {
+	q := r.URL.Query()
+	k = graphKey{pkg: strings.TrimSpace(q.Get("pkg")), depth: defaultDepth, cycle: q.Get("cycle") != ""}
+	if n, err := strconv.Atoi(q.Get("depth")); err == nil && n >= 0 {
+		k.depth = min(n, maxDepth)
+	}
+	return k, q.Has("pkg")
+}
+
+// drawing is a laid-out graph. It is immutable once cached.
+type drawing struct {
+	dot, svg  string
+	notice    string
+	nodes     int
+	cycleSize int
+}
+
+// maxCachedDrawings bounds the cache. A dense drawing of maxGraphNodes packages
+// is about 360 KB (60 KB of DOT and 300 KB of SVG, measured on a reasonably large example project),
+// so this is at most about 25 MB.
+const maxCachedDrawings = 64
+
+// drawingCache holds the most recent drawings, evicting the oldest first. The
+// zero value is ready to use.
+type drawingCache struct {
+	mu    sync.Mutex
+	m     map[graphKey]*drawing
+	order []graphKey // insertion order
+}
+
+func (c *drawingCache) get(k graphKey) *drawing {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.m[k]
+}
+
+func (c *drawingCache) put(k graphKey, d *drawing) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m == nil {
+		c.m = map[graphKey]*drawing{}
+	}
+	if _, ok := c.m[k]; !ok {
+		if len(c.order) == maxCachedDrawings {
+			delete(c.m, c.order[0])
+			c.order = c.order[1:]
+		}
+		c.order = append(c.order, k)
+	}
+	c.m[k] = d
+}
+
+// noPackageError says that a package is not in the graph, either because it
+// does not exist or because it has no dependencies across packages.
+type noPackageError string
+
+func (e noPackageError) Error() string {
+	return fmt.Sprintf("Package %q has no dependencies on or from other packages.", string(e))
+}
+
+// draw returns the drawing for k, laying it out only if it is not cached.
+// Failures are not cached.
+func (s *server) draw(ctx context.Context, k graphKey) (*drawing, error) {
+	if d := s.drawings.get(k); d != nil {
+		return d, nil
+	}
+	g, err := s.loadPkgGraph(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !g.has(k.pkg) {
+		return nil, noPackageError(k.pkg)
+	}
+	d := &drawing{}
+	centers := []string{k.pkg}
+	cycle := g.component(k.pkg)
+	d.cycleSize = len(cycle)
+	if k.cycle {
+		centers = cycle
+	}
+	nodes, truncated := g.neighborhood(centers, k.depth, maxGraphNodes)
+	d.nodes = len(nodes)
+	if truncated {
+		d.notice = fmt.Sprintf("Showing the %d packages nearest the center; lower the depth to see everything within it.", maxGraphNodes)
+	}
+	if len(cycle) < 2 {
+		cycle = nil // a lone package is not a cycle
+	}
+	d.dot = g.dot(nodes, centers, cycle, func(p string) string { return graphURL(p, k.depth, k.cycle) })
+	if d.svg, err = renderSVG(ctx, d.dot); err != nil {
+		return nil, err
+	}
+	s.drawings.put(k, d)
+	return d, nil
+}
+
 // graphView is what graph.html renders.
 type graphView struct {
 	DB        string
 	Pkg       string
 	HasPkg    bool
 	Depth     int
-	Cycle     bool // draw the whole dependency cycle of Pkg as the center
+	Cycle     bool
 	MaxDepth  int
 	Err       string
 	Notice    string
 	SVG       template.HTML
 	Nodes     int
 	CycleSize int
-}
-
-// graphURL returns the link to the graph page centered on pkg.
-func graphURL(pkg string, depth int, cycle bool) string {
-	p := url.Values{"pkg": {pkg}, "depth": {strconv.Itoa(depth)}}
-	if cycle {
-		p.Set("cycle", "1")
-	}
-	return "graph?" + p.Encode()
+	DotURL    string // download links for the drawing
+	SVGURL    string
 }
 
 func (s *server) graph(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	v := graphView{DB: s.dbName, Pkg: strings.TrimSpace(q.Get("pkg")), HasPkg: q.Has("pkg"),
-		Depth: defaultDepth, Cycle: q.Get("cycle") != "", MaxDepth: maxDepth}
-	if n, err := strconv.Atoi(q.Get("depth")); err == nil && n >= 0 {
-		v.Depth = min(n, maxDepth)
-	}
-	if v.HasPkg {
-		s.fillGraph(r.Context(), &v)
+	k, hasPkg := parseGraphKey(r)
+	v := graphView{DB: s.dbName, Pkg: k.pkg, HasPkg: hasPkg, Depth: k.depth, Cycle: k.cycle, MaxDepth: maxDepth}
+	if hasPkg {
+		if d, err := s.draw(r.Context(), k); err != nil {
+			v.Err = err.Error()
+		} else {
+			v.Notice, v.Nodes, v.CycleSize = d.notice, d.nodes, d.cycleSize
+			// The SVG is Graphviz's own output, and every string it embeds is escaped.
+			v.SVG = template.HTML(d.svg)
+			v.DotURL, v.SVGURL = "graph.dot?"+k.query(), "graph.svg?"+k.query()
+		}
 	}
 	if err := graphTmpl.Execute(w, v); err != nil {
 		log.Printf("render: %v", err)
 	}
 }
 
-// fillGraph runs the graph for v's inputs and sets its output fields.
-func (s *server) fillGraph(ctx context.Context, v *graphView) {
-	g, err := s.loadPkgGraph(ctx)
-	if err != nil {
-		v.Err = err.Error()
+// graphFile serves one part of the drawing for the request's parameters as a
+// download named after them, with ext as its extension.
+func (s *server) graphFile(w http.ResponseWriter, r *http.Request, ext, contentType string, part func(*drawing) string) {
+	k, ok := parseGraphKey(r)
+	if !ok {
+		http.Error(w, "missing pkg parameter", http.StatusBadRequest)
 		return
 	}
-	if !g.has(v.Pkg) {
-		v.Err = fmt.Sprintf("Package %q has no dependencies on or from other packages.", v.Pkg)
+	d, err := s.draw(r.Context(), k)
+	var missing noPackageError
+	switch {
+	case errors.As(err, &missing):
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	centers := []string{v.Pkg}
-	cycle := g.component(v.Pkg)
-	v.CycleSize = len(cycle)
-	if v.Cycle {
-		centers = cycle
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": k.filename(ext)}))
+	io.WriteString(w, part(d))
+}
+
+var unsafeFilenameChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+// filename returns a file name for the drawing of k, such as
+// "graph-comp_core-depth1-cycle.dot".
+func (k graphKey) filename(ext string) string {
+	pkg := unsafeFilenameChars.ReplaceAllString(k.pkg, "_")
+	if pkg == "" {
+		pkg = "root"
 	}
-	nodes, truncated := g.neighborhood(centers, v.Depth, maxGraphNodes)
-	v.Nodes = len(nodes)
-	if truncated {
-		v.Notice = fmt.Sprintf("Showing the %d packages nearest the center; lower the depth to see everything within it.", maxGraphNodes)
+	name := fmt.Sprintf("graph-%s-depth%d", pkg, k.depth)
+	if k.cycle {
+		name += "-cycle"
 	}
-	if len(cycle) < 2 {
-		cycle = nil // a lone package is not a cycle
-	}
-	dot := g.dot(nodes, centers, cycle, func(p string) string { return graphURL(p, v.Depth, v.Cycle) })
-	if v.SVG, err = renderSVG(ctx, dot); err != nil {
-		v.Err = err.Error()
-	}
+	return name + "." + ext
 }

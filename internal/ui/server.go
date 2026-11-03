@@ -34,6 +34,8 @@ type server struct {
 
 	pkgMu sync.Mutex
 	pkgs  *pkgGraph // loaded on first use
+
+	drawings drawingCache // laid-out graphs, by request
 }
 
 // NewServer returns a handler serving the page for db. dbName is shown in the
@@ -45,6 +47,12 @@ func NewServer(db *sql.DB, dbName string, pageRows int, timeout time.Duration) h
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /q/{id}", s.fragment)
 	mux.HandleFunc("GET /graph", s.graph)
+	mux.HandleFunc("GET /graph.dot", func(w http.ResponseWriter, r *http.Request) {
+		s.graphFile(w, r, "dot", "text/vnd.graphviz; charset=utf-8", func(d *drawing) string { return d.dot })
+	})
+	mux.HandleFunc("GET /graph.svg", func(w http.ResponseWriter, r *http.Request) {
+		s.graphFile(w, r, "svg", "image/svg+xml", func(d *drawing) string { return d.svg })
+	})
 	return mux
 }
 
