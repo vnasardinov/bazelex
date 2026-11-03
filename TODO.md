@@ -70,10 +70,6 @@ they refer to, and `git log -L` or `git blame` to follow it since.
     edges, and the layout can run for minutes (the file's own comment
     says 90 seconds). Concurrent requests each run their own WASM layout
     with no limit. Apply `s.timeout` and consider limiting concurrency.
--   **New Graphviz instance per request** (line 189, `renderSVG`).
-    `graphviz.New(ctx)` creates and compiles a wazero runtime each time:
-    hundreds of milliseconds and tens of MB, paid again on every click
-    on a node link. Create it once, guard it with a mutex, and reuse it.
 -   **Cycle larger than the node cap** (lines 303-306, `fillGraph`). With "center on
     cycle" on and a cycle of 60 or more packages, the cap truncates the
     centers themselves, by name order. The requested package may not be

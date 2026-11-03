@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-graphviz"
 )
 
 const maxLabels = 20000
@@ -34,6 +36,9 @@ type server struct {
 
 	pkgMu sync.Mutex
 	pkgs  *pkgGraph // loaded on first use
+
+	gvMu sync.Mutex
+	gv   *graphviz.Graphviz // created on first render, never closed
 
 	drawings drawingCache // laid-out graphs, by request
 }

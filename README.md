@@ -97,7 +97,9 @@ cycle, shown in red). Click a package in the drawing to re-center on it. At most
 alternatives. The page links to the drawing's DOT source and SVG as downloads
 (`/graph.dot` and `/graph.svg`, which take the same parameters). Because the
 database is read-only, a laid-out drawing is kept in memory (the 64 most recent),
-and asking for it again is instant.
+and asking for it again is instant. New drawings are laid out one at a time
+with a single shared Graphviz instance, so a slow layout delays every other
+request for a drawing that is not cached yet.
 
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite

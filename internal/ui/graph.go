@@ -190,12 +190,22 @@ func dotQuote(s string) string {
 
 // renderSVG lays out the DOT source and returns the SVG element, without the
 // XML prolog and doctype, so that it can be embedded in a page or saved as is.
-func renderSVG(ctx context.Context, dot string) (string, error) {
-	g, err := graphviz.New(ctx)
-	if err != nil {
-		return "", err
+//
+// Creating a Graphviz instance compiles the WASM module, which is slow and
+// memory-hungry, so the server creates one on first use and keeps it. An
+// instance is not safe for concurrent use, so renders take turns.
+func (s *server) renderSVG(ctx context.Context, dot string) (string, error) {
+	s.gvMu.Lock()
+	defer s.gvMu.Unlock()
+	if s.gv == nil {
+		// Not ctx: the instance outlives this request.
+		g, err := graphviz.New(context.Background())
+		if err != nil {
+			return "", err
+		}
+		s.gv = g
 	}
-	defer g.Close()
+	g := s.gv
 	gr, err := graphviz.ParseBytes([]byte(dot))
 	if err != nil {
 		return "", err
@@ -360,7 +370,7 @@ func (s *server) draw(ctx context.Context, k graphKey) (*drawing, error) {
 		cycle = nil // a lone package is not a cycle
 	}
 	d.dot = g.dot(nodes, centers, cycle, func(p string) string { return graphURL(p, k.depth, k.cycle) })
-	if d.svg, err = renderSVG(ctx, d.dot); err != nil {
+	if d.svg, err = s.renderSVG(ctx, d.dot); err != nil {
 		return nil, err
 	}
 	s.drawings.put(k, d)
