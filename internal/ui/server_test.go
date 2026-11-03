@@ -329,3 +329,25 @@ func TestFragmentUnknown(t *testing.T) {
 		t.Errorf("status %d, want 404", w.Code)
 	}
 }
+
+func TestLanguageSeams(t *testing.T) {
+	path := testDB(t)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, s := range []string{
+		`UPDATE target SET rule_class = 'go_library' WHERE id = 1`,
+		`UPDATE target SET rule_class = 'cc_library' WHERE id = 2`,
+		`UPDATE edge SET attr = 'cdeps' WHERE from_id = 1`,
+	} {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body := get(t, path, "/")
+	if want := `<td>go</td><td>cc</td><td>cdeps</td><td class="num">1</td>`; !strings.Contains(body, want) {
+		t.Errorf("missing %q in:\n%s", want, body)
+	}
+}

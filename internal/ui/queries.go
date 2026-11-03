@@ -255,4 +255,26 @@ ORDER BY depth LIMIT 1;`,
   )
 SELECT len AS depth, path FROM up WHERE depth = 0;`,
 	},
+	{
+		ID:          "language-seams",
+		Title:       "Cross-language seams",
+		Description: "Dependencies between rules written for different languages, guessed from the rule class (go_*, cc_*, py_*, rust_*, java_*, proto_library). Rules that name no language, such as filegroup and genrule, are left out, so seams that go through them are missed. Counts every dependency attribute (cdeps and data included), not just deps and embed.",
+		SQL: `WITH lang(id, l) AS (
+  SELECT id, CASE
+    WHEN rule_class LIKE 'go\_%' ESCAPE '\' OR rule_class = '_cgo_godefs' THEN 'go'
+    WHEN rule_class LIKE 'cc\_%' ESCAPE '\' THEN 'cc'
+    WHEN rule_class LIKE 'py\_%' ESCAPE '\' THEN 'py'
+    WHEN rule_class LIKE 'rust\_%' ESCAPE '\' THEN 'rust'
+    WHEN rule_class LIKE 'java\_%' ESCAPE '\' THEN 'java'
+    WHEN rule_class = 'proto_library' THEN 'proto'
+  END FROM target WHERE kind = 'rule'
+)
+SELECT a.l AS from_lang, b.l AS to_lang, e.attr, COUNT(*) AS n
+FROM edge e
+JOIN lang a ON a.id = e.from_id
+JOIN lang b ON b.id = e.to_id
+WHERE a.l <> b.l AND e.nodep = 0
+  AND e.attr NOT IN ('visibility', '<implicit>', '<generating_rule>', '<select_condition>')
+GROUP BY a.l, b.l, e.attr ORDER BY n DESC;`,
+	},
 }

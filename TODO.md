@@ -136,6 +136,24 @@ most.
     This shows the cross-language seams: where FFI, codegen, or
     generated bindings glue ecosystems together. Those seams are usually
     the most fragile and the slowest to build.
+    -   Done: the "Cross-language seams" query in the UI counts
+        dependencies between rules of different languages, by attribute.
+    -   Known gap: language is guessed from `rule_class` prefixes in the
+        query. Macro-defined rules (`_pywrap_split_library`, `_ebpf_prog`)
+        and language-neutral rules (`filegroup`, `genrule`, `alias`,
+        `pkg_files`) are unclassified, so seams that run through them are
+        missed. Next: look through neutral rules to the nearest
+        language-bearing rule, or classify them by the extensions of their
+        `srcs`.
+    -   Known gap: the class-to-language map is hard-coded. Make it a
+        table or view in the schema that can be overridden per workspace.
+    -   Known gap: `rule_dep` only follows `deps` and `embed`, so it misses
+        `cdeps` and `data`, which is where Go-to-C++ seams live in
+        datadog-agent. Add a view over all real dependency attributes.
+    -   Next: a drill-down listing the edges for one language pair, and a
+        `/graph?by=lang` quotient graph with languages as nodes.
+    -   Test data: datadog-agent (Go to C++ via `cdeps`, C++ to Rust) and
+        tensorflow (proto codegen, Python/Java to C++).
 
 ### By target kind or role
 
