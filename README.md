@@ -109,14 +109,17 @@ Then open <http://localhost:6060>. Notes:
 
 * `--db` is a database written by `bazelex`. A relative path is resolved
   against the directory you ran the command from. `--http` defaults to `:6060`.
-  `--rows` sets how many result rows are shown at once (default 20).
+  `--rows` sets how many result rows are shown at once (default 20), and
+  `--parallel` how many queries the page runs at once (default 5).
 * The `--` before the flags is required. Without it Bazel tries to parse them
   as its own options.
 * For a parameterized query, fill in its inputs and press Run. The inputs autocomplete from the
   rule labels in the database, and their values are kept in the URL.
 * The database is opened read-only, and each query is limited to 120 seconds
   (change it with `--timeout`, for example `--timeout=5m`), because the recursive
-  queries can be slow on large graphs.
+  queries can be slow on large graphs. Being read-only, it can also serve several
+  queries at once, each on its own connection, which is how the page runs them
+  (see `--parallel`).
 * The UI never runs Bazel, so it can serve a database of any project. Run it
   from a bazelex checkout and point `--db` at the file, or use the built binary
   (`bazel build //cmd/bazelex_ui`, then `bazel-bin/cmd/bazelex_ui/bazelex_ui_/bazelex_ui`).

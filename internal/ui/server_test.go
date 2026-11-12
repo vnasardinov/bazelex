@@ -47,13 +47,20 @@ func get(t *testing.T, path, url string) string {
 
 func getRows(t *testing.T, path, url string, rows int) string {
 	t.Helper()
+	return serve(t, path, url, rows, 5)
+}
+
+// serve returns the page for url, showing rows rows at a time and running at
+// most parallel queries at once.
+func serve(t *testing.T, path, url string, rows, parallel int) string {
+	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	NewServer(db, "g.sqlite", rows, 10*time.Second).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
+	NewServer(db, "g.sqlite", rows, parallel, 10*time.Second).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
 	if w.Code != 200 {
 		t.Fatalf("status %d", w.Code)
 	}
@@ -148,6 +155,22 @@ func TestSelfContainedQueries(t *testing.T) {
 	// new page doesn't re-run the expensive query.
 	if !strings.Contains(body, `<a href="?transitive-deps.target=%2F%2Fp%3Aa#transitive-deps" target="_blank" rel="noopener">//p:a</a></td><td class="num">2</td>`) {
 		t.Errorf("heaviest missing or links wrong:\n%s", body)
+	}
+}
+
+// The pool size must not change what the page shows, and a pool of one must not
+// deadlock. It also exercises the concurrent query path under -race.
+func TestParallelQueries(t *testing.T) {
+	path := testDB(t)
+	want := get(t, path, "/")
+	for _, parallel := range []int{1, 2, 100} {
+		if got := serve(t, path, "/", 20, parallel); got != want {
+			t.Errorf("parallel=%d changed the page:\n%s", parallel, got)
+		}
+	}
+	// A parameterized query still runs, alongside the cheap ones.
+	if got := serve(t, path, "/?transitive-deps.target=//p:a", 20, 2); !strings.Contains(got, "<td>//p:c</td>") {
+		t.Errorf("transitive-deps missing:\n%s", got)
 	}
 }
 
@@ -324,7 +347,7 @@ func TestFragmentUnknown(t *testing.T) {
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	NewServer(db, "g", 20, time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/q/nope", nil))
+	NewServer(db, "g", 20, 5, time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/q/nope", nil))
 	if w.Code != 404 {
 		t.Errorf("status %d, want 404", w.Code)
 	}

@@ -19,6 +19,7 @@ var (
 	httpAddr = flag.String("http", ":6060", "address to listen on")
 	dbPath   = flag.String("db", "bazelex.sqlite", "SQLite database written by bazelex")
 	pageRows = flag.Int("rows", 20, "maximum number of result rows to show at once; longer results are paginated")
+	parallel = flag.Int("parallel", 5, "maximum number of queries to run at once")
 	timeout  = flag.Duration("timeout", 120*time.Second, "limit on how long each query may run")
 )
 
@@ -34,6 +35,9 @@ func main() {
 	}
 	if *pageRows < 1 {
 		log.Fatalf("-rows must be at least 1, got %d", *pageRows)
+	}
+	if *parallel < 1 {
+		log.Fatalf("-parallel must be at least 1, got %d", *parallel)
 	}
 	if *timeout <= 0 {
 		log.Fatalf("-timeout must be positive, got %v", *timeout)
@@ -53,5 +57,5 @@ func main() {
 	}
 
 	log.Printf("serving %s on %s", *dbPath, *httpAddr)
-	log.Fatal(http.ListenAndServe(*httpAddr, ui.NewServer(db, *dbPath, *pageRows, *timeout)))
+	log.Fatal(http.ListenAndServe(*httpAddr, ui.NewServer(db, *dbPath, *pageRows, *parallel, *timeout)))
 }

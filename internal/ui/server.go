@@ -32,6 +32,7 @@ type server struct {
 	db       *sql.DB
 	dbName   string
 	pageRows int           // rows shown per page
+	parallel int           // queries that may run at once
 	timeout  time.Duration // limit on each query
 
 	pkgMu sync.Mutex
@@ -44,10 +45,11 @@ type server struct {
 }
 
 // NewServer returns a handler serving the page for db. dbName is shown in the
-// page header, pageRows is the maximum number of result rows shown at once, and
-// timeout limits how long each query may run.
-func NewServer(db *sql.DB, dbName string, pageRows int, timeout time.Duration) http.Handler {
-	s := &server{db: db, dbName: dbName, pageRows: pageRows, timeout: timeout}
+// page header, pageRows is the maximum number of result rows shown at once,
+// parallel is how many queries may run at once, and timeout limits how long
+// each query may run.
+func NewServer(db *sql.DB, dbName string, pageRows, parallel int, timeout time.Duration) http.Handler {
+	s := &server{db: db, dbName: dbName, pageRows: pageRows, parallel: parallel, timeout: timeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /q/{id}", s.fragment)
@@ -105,9 +107,8 @@ type pageData struct {
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	page := pageData{DB: s.dbName, Limit: s.pageRows, Labels: s.ruleLabels(r.Context())}
-	for _, q := range queries {
-		v := s.view(r.Context(), q, params)
-		if q.selfContained() {
+	for _, v := range s.views(r.Context(), params) {
+		if v.selfContained() {
 			page.SelfContained = append(page.SelfContained, v)
 		} else {
 			page.Parameterized = append(page.Parameterized, v)
@@ -116,6 +117,37 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	if err := indexTmpl.Execute(w, page); err != nil {
 		log.Printf("render: %v", err)
 	}
+}
+
+// views builds the view of every canned query for the given URL parameters, in
+// the order of queries. The cheap ones run in parallel, at most s.parallel at a
+// time: SQLite allows concurrent readers, each on its own connection, as long as
+// the database is opened read-only. Expensive queries are rare and may be slow,
+// so they run afterwards, one at a time, rather than tying up a slot; a skipped
+// one runs no SQL at all.
+func (s *server) views(ctx context.Context, params url.Values) []queryView {
+	views := make([]queryView, len(queries))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, s.parallel)
+	for i, q := range queries {
+		if q.Expensive {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			views[i] = s.view(ctx, q, params)
+		}()
+	}
+	wg.Wait()
+	for i, q := range queries {
+		if q.Expensive {
+			views[i] = s.view(ctx, q, params)
+		}
+	}
+	return views
 }
 
 // fragment serves the inner part of one query's section, so that script can

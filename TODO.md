@@ -43,12 +43,6 @@ The figures are from running bazelex over the
 
 ## Web UI
 
--   **Parallel cheap queries.** Run them in a bounded pool of
-    goroutines, with the limit set by a flag (default 5). SQLite allows
-    concurrent readers, each on its own connection, so `database/sql`'s
-    pool works as long as the database is opened read-only (or in WAL
-    mode).
-
 -   In `internal/ui/index.html`, if two refreshes for the same section
     overlap (the user clicks twice quickly), nothing here cancels the
     first. Whichever response arrives last wins, and the earlier
