@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bazelex Datalog</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 2em auto; padding: 0 1em; max-width: 70em; }
+  textarea { width: 100%; box-sizing: border-box; font: 13px/1.4 monospace; }
+  table { border-collapse: collapse; margin-top: 1em; }
+  caption { text-align: left; font-family: monospace; font-weight: bold; padding-bottom: .2em; }
+  th, td { border: 1px solid #ddd; padding: 2px 8px; text-align: left; font-family: monospace; }
+  th { background: #f4f4f4; }
+  .err { color: #b00; white-space: pre-wrap; }
+  .note { color: #666; }
+  ul { padding-left: 1.2em; }
+</style>
+</head>
+<body>
+<p><a href=".">&larr; bazelex</a></p>
+<h1>Datalog</h1>
+<p class="note">Runs a <a href="https://github.com/google/mangle">Mangle</a> program over the build graph
+in <code>{{.DB}}</code>. The facts loaded are <code>target(Label, Kind, Package)</code>,
+<code>dep(From, To)</code> (rule-to-rule <code>deps</code> and <code>embed</code>, as elsewhere) and
+<code>edge(From, To, Attr)</code> (every dependency edge). Labels are strings, so write
+<code>dep("//foo:bar", X)</code>.</p>
+
+<h2>Examples</h2>
+<ul>
+{{range .Samples}}<li><a href="?program={{.Program | urlquery}}">{{.Title}}</a> &ndash; {{.Description}}</li>
+{{end}}</ul>
+
+<form method="get" action="datalog">
+<textarea name="program" rows="12" spellcheck="false">{{.Program}}</textarea>
+<p><button type="submit">Run</button></p>
+</form>
+
+{{if .Err}}<p class="err">{{.Err}}</p>
+{{else if .Ran}}
+  <p class="note">{{.Result.EDB}} facts loaded, {{.Result.Derived}} derived.</p>
+  {{if .Result.Relations}}
+    {{range .Result.Relations}}
+    <table>
+      <caption>{{.Name}}</caption>
+      <tr>{{range .Columns}}<th>{{.}}</th>{{end}}</tr>
+      {{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}
+    </table>
+    {{if gt .Total (len .Rows)}}<p class="note">Showing the first {{len .Rows}} of {{.Total}} rows.</p>
+    {{end}}
+    {{end}}
+  {{else}}<p class="note">This program derived no relations. A rule with a body defines one, as in
+    <code>r(X) :- target(X, "rule", _).</code></p>
+  {{end}}
+{{end}}
+</body>
+</html>

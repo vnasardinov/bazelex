@@ -39,7 +39,8 @@
 </nav>
 <main>
 <h1>bazelex</h1>
-<p class="note">Database: <code>{{.DB}}</code>. Results are shown {{.Limit}} rows per page.</p>
+<p class="note">Database: <code>{{.DB}}</code>. Results are shown {{.Limit}} rows per page.
+Also: <a href="graph">package graph</a> &middot; <a href="datalog">Datalog</a>.</p>
 <datalist id="labels">{{range .Labels}}<option value="{{.}}">{{end}}</datalist>
 
 {{define "inner"}}

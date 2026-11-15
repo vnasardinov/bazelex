@@ -101,6 +101,18 @@ and asking for it again is instant. New drawings are laid out one at a time
 with a single shared Graphviz instance, so a slow layout delays every other
 request for a drawing that is not cached yet.
 
+A third page, `/datalog`, runs a [Mangle](https://github.com/google/mangle)
+(Datalog) program over the same graph. On first use it translates the database
+into facts: `target(Label, Kind, Package)`, `dep(From, To)` (rule-to-rule `deps`
+and `embed`, as above) and `edge(From, To, Attr)` (every dependency edge).
+Labels are Mangle *string* constants, so a program writes
+`dep("//foo:bar", X)` rather than `dep(//foo:bar, X)`: a Bazel label's leading
+`//` is not a valid name constant. The page offers two examples, transitive
+dependencies (recursion) and the rules nothing depends on (negation), and it
+renders every relation the program derives. A program may derive at most 500k
+facts before evaluation stops with an error, and each table shows its first 200
+rows.
+
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite
 ```

@@ -43,6 +43,8 @@ type server struct {
 	gv   *graphviz.Graphviz // created on first render, never closed
 
 	drawings drawingCache // laid-out graphs, by request
+
+	facts edbCache // graph facts for the Datalog page, loaded on first use
 }
 
 // Config configures the page. PageRows, Parallel and Timeout must be positive,
@@ -79,6 +81,7 @@ func NewServer(db *sql.DB, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /q/{id}", s.fragment)
 	mux.HandleFunc("GET /graph", s.graph)
+	mux.HandleFunc("GET /datalog", s.datalog)
 	mux.HandleFunc("GET /graph.dot", func(w http.ResponseWriter, r *http.Request) {
 		s.graphFile(w, r, "dot", "text/vnd.graphviz; charset=utf-8", func(d *drawing) string { return d.dot })
 	})

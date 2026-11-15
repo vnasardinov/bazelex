@@ -41,6 +41,24 @@ The figures are from running bazelex over the
     consider an `implicit` column so queries don't need to filter on
     name prefixes.
 
+## Datalog page
+
+-   **Mangle moved.** The `github.com/google/mangle` module path is frozen at
+    v0.4.0; from v0.5.0 the same code is published as
+    `codeberg.org/TauCeti/mangle-go`, and requiring the GitHub path at a later
+    version fails with a module path mismatch. The UI pins v0.4.0, the last
+    release under the GitHub path. Moving to the Codeberg path is a `go.mod`
+    and `MODULE.bazel` change plus `gazelle`, and buys nothing yet.
+-   **One fact store per request.** `engine.EvalProgram` adds derived facts to
+    the store it is given, so every request copies the loaded facts into a
+    fresh store. That is about 140k atoms for a 26k-target graph
+    (`datadog-agent.sqlite`). A read-only layer plus a delta store would avoid
+    the copy.
+-   **No time bound.** Evaluation is bounded by the derived-fact limit, not by
+    `--timeout`, because `EvalProgram` takes no context. A program near the
+    limit holds the request for that long: the transitive closure of a large
+    graph took about 12 seconds and 375k facts.
+
 ## Web UI
 
 -   In `internal/ui/index.html`, if two refreshes for the same section
