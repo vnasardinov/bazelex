@@ -28,12 +28,13 @@ var indexHTML string
 
 var indexTmpl = template.Must(template.New("index").Parse(indexHTML))
 
+// server serves one database, configured by the Config NewServer was given.
 type server struct {
 	db       *sql.DB
 	dbName   string
-	pageRows int           // rows shown per page
-	parallel int           // queries that may run at once
-	timeout  time.Duration // limit on each query
+	pageRows int
+	parallel int
+	timeout  time.Duration
 
 	pkgMu sync.Mutex
 	pkgs  *pkgGraph // loaded on first use
@@ -44,12 +45,36 @@ type server struct {
 	drawings drawingCache // laid-out graphs, by request
 }
 
-// NewServer returns a handler serving the page for db. dbName is shown in the
-// page header, pageRows is the maximum number of result rows shown at once,
-// parallel is how many queries may run at once, and timeout limits how long
-// each query may run.
-func NewServer(db *sql.DB, dbName string, pageRows, parallel int, timeout time.Duration) http.Handler {
-	s := &server{db: db, dbName: dbName, pageRows: pageRows, parallel: parallel, timeout: timeout}
+// Config configures the page. PageRows, Parallel and Timeout must be positive,
+// and DBName names the database in the page header, so the zero value is not
+// usable; Validate reports what is wrong with it.
+type Config struct {
+	DBName   string        // shown in the page header
+	PageRows int           // maximum number of result rows shown at once
+	Parallel int           // how many queries may run at once
+	Timeout  time.Duration // limit on how long each query may run
+}
+
+// Validate reports whether c can be used to build a server.
+func (c Config) Validate() error {
+	switch {
+	case c.PageRows < 1:
+		return fmt.Errorf("page rows must be at least 1, got %d", c.PageRows)
+	case c.Parallel < 1:
+		return fmt.Errorf("parallel must be at least 1, got %d", c.Parallel)
+	case c.Timeout <= 0:
+		return fmt.Errorf("timeout must be positive, got %v", c.Timeout)
+	}
+	return nil
+}
+
+// NewServer returns a handler serving the page for db, as configured by cfg. It
+// returns an error if cfg is not usable.
+func NewServer(db *sql.DB, cfg Config) (http.Handler, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	s := &server{db: db, dbName: cfg.DBName, pageRows: cfg.PageRows, parallel: cfg.Parallel, timeout: cfg.Timeout}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /q/{id}", s.fragment)
@@ -60,7 +85,7 @@ func NewServer(db *sql.DB, dbName string, pageRows, parallel int, timeout time.D
 	mux.HandleFunc("GET /graph.svg", func(w http.ResponseWriter, r *http.Request) {
 		s.graphFile(w, r, "svg", "image/svg+xml", func(d *drawing) string { return d.svg })
 	})
-	return mux
+	return mux, nil
 }
 
 // cell is one value in a result row. URL is set when it should be a link, and

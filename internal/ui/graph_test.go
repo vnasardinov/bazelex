@@ -128,7 +128,7 @@ func TestGraphDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ro.Close()
-	h := NewServer(ro, "g.sqlite", 20, 5, 10*time.Second)
+	h := newTestServer(t, ro, "g.sqlite", 20, 5)
 	fetch := func(url string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", url, nil))

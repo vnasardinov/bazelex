@@ -3,6 +3,7 @@ package ui
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
@@ -50,6 +51,17 @@ func getRows(t *testing.T, path, url string, rows int) string {
 	return serve(t, path, url, rows, 5)
 }
 
+// newTestServer returns a server for db, showing rows rows at a time, running
+// at most parallel queries at once, and naming dbName in the page header.
+func newTestServer(t *testing.T, db *sql.DB, dbName string, rows, parallel int) http.Handler {
+	t.Helper()
+	h, err := NewServer(db, Config{DBName: dbName, PageRows: rows, Parallel: parallel, Timeout: 10 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
 // serve returns the page for url, showing rows rows at a time and running at
 // most parallel queries at once.
 func serve(t *testing.T, path, url string, rows, parallel int) string {
@@ -60,7 +72,7 @@ func serve(t *testing.T, path, url string, rows, parallel int) string {
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	NewServer(db, "g.sqlite", rows, parallel, 10*time.Second).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
+	newTestServer(t, db, "g.sqlite", rows, parallel).ServeHTTP(w, httptest.NewRequest("GET", url, nil))
 	if w.Code != 200 {
 		t.Fatalf("status %d", w.Code)
 	}
@@ -347,7 +359,7 @@ func TestFragmentUnknown(t *testing.T) {
 	}
 	defer db.Close()
 	w := httptest.NewRecorder()
-	NewServer(db, "g", 20, 5, time.Second).ServeHTTP(w, httptest.NewRequest("GET", "/q/nope", nil))
+	newTestServer(t, db, "g", 20, 5).ServeHTTP(w, httptest.NewRequest("GET", "/q/nope", nil))
 	if w.Code != 404 {
 		t.Errorf("status %d, want 404", w.Code)
 	}
@@ -372,5 +384,35 @@ func TestLanguageSeams(t *testing.T) {
 	body := get(t, path, "/")
 	if want := `<td>go</td><td>cc</td><td>cdeps</td><td class="num">1</td>`; !strings.Contains(body, want) {
 		t.Errorf("missing %q in:\n%s", want, body)
+	}
+}
+
+func TestConfigValidate(t *testing.T) {
+	if err := (Config{DBName: "g", PageRows: 20, Parallel: 5, Timeout: time.Second}).Validate(); err != nil {
+		t.Errorf("valid config rejected: %v", err)
+	}
+	for _, c := range []struct {
+		name string
+		cfg  Config
+	}{
+		{"no page rows", Config{PageRows: 0, Parallel: 5, Timeout: time.Second}},
+		{"no pool", Config{PageRows: 20, Parallel: 0, Timeout: time.Second}},
+		{"no timeout", Config{PageRows: 20, Parallel: 5}},
+		{"negative timeout", Config{PageRows: 20, Parallel: 5, Timeout: -time.Second}},
+	} {
+		if err := c.cfg.Validate(); err == nil {
+			t.Errorf("%s: Validate() = nil, want error", c.name)
+		}
+	}
+}
+
+func TestNewServerRejectsBadConfig(t *testing.T) {
+	db, err := sql.Open("sqlite", "file:"+testDB(t)+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := NewServer(db, Config{DBName: "g", PageRows: 20, Parallel: 5}); err == nil {
+		t.Error("NewServer accepted a non-positive timeout")
 	}
 }

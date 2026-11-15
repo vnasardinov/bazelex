@@ -33,15 +33,6 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	if *pageRows < 1 {
-		log.Fatalf("-rows must be at least 1, got %d", *pageRows)
-	}
-	if *parallel < 1 {
-		log.Fatalf("-parallel must be at least 1, got %d", *parallel)
-	}
-	if *timeout <= 0 {
-		log.Fatalf("-timeout must be positive, got %v", *timeout)
-	}
 	if _, err := os.Stat(*dbPath); err != nil {
 		log.Fatal(err)
 	}
@@ -56,6 +47,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Whether the knobs are usable is the ui package's business, so hand them
+	// over in one value and let it reject a bad combination.
+	srv, err := ui.NewServer(db, ui.Config{
+		DBName:   *dbPath,
+		PageRows: *pageRows,
+		Parallel: *parallel,
+		Timeout:  *timeout,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Printf("serving %s on %s", *dbPath, *httpAddr)
-	log.Fatal(http.ListenAndServe(*httpAddr, ui.NewServer(db, *dbPath, *pageRows, *parallel, *timeout)))
+	log.Fatal(http.ListenAndServe(*httpAddr, srv))
 }
