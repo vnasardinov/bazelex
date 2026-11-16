@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/google/mangle/ast"
 )
 
 // datalogPage runs program on a server over the fixture database and returns
@@ -96,16 +94,5 @@ func TestDatalogErrors(t *testing.T) {
 		if body := datalogPage(t, program); !strings.Contains(body, `<p class="err">`) {
 			t.Errorf("%q: no error shown:\n%s", program, body)
 		}
-	}
-}
-
-func TestDatalogFactLimit(t *testing.T) {
-	edb := []ast.Atom{
-		ast.NewAtom("target", ast.String("//p:a"), ast.String("rule"), ast.String("p")),
-		ast.NewAtom("target", ast.String("//p:b"), ast.String("rule"), ast.String("p")),
-	}
-	// Three rules, so the cross product is nine facts, above the limit of one.
-	if _, err := evalDatalog("p(X, Y) :- target(X, _, _), target(Y, _, _).", edb, 1); err == nil {
-		t.Error("want a fact limit error")
 	}
 }

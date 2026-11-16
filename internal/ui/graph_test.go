@@ -5,56 +5,14 @@ import (
 	"database/sql"
 	"net/http/httptest"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/vnasardinov/bazelex/internal/engine"
 	"github.com/vnasardinov/bazelex/internal/graphdb"
 )
-
-// testPkgGraph is x <-> y -> z -> w.
-func testPkgGraph() *pkgGraph {
-	g := newPkgGraph()
-	g.add("x", "y", 2)
-	g.add("y", "x", 1)
-	g.add("y", "z", 1)
-	g.add("z", "w", 1)
-	return g
-}
-
-func TestComponent(t *testing.T) {
-	g := testPkgGraph()
-	if got := g.component("y"); !slices.Equal(got, []string{"x", "y"}) {
-		t.Errorf("component(y) = %v", got)
-	}
-	if got := g.component("z"); !slices.Equal(got, []string{"z"}) {
-		t.Errorf("component(z) = %v", got)
-	}
-}
-
-func TestNeighborhood(t *testing.T) {
-	g := testPkgGraph()
-	for _, c := range []struct {
-		centers []string
-		depth   int
-		limit   int
-		want    []string
-		trunc   bool
-	}{
-		{[]string{"z"}, 0, 10, []string{"z"}, false},
-		{[]string{"z"}, 1, 10, []string{"z", "w", "y"}, false},
-		{[]string{"z"}, 2, 10, []string{"z", "w", "y", "x"}, false},
-		{[]string{"x", "y"}, 1, 10, []string{"x", "y", "z"}, false},
-		{[]string{"z"}, 5, 2, []string{"z", "w"}, true},
-	} {
-		got, trunc := g.neighborhood(c.centers, c.depth, c.limit)
-		if !slices.Equal(got, c.want) || trunc != c.trunc {
-			t.Errorf("neighborhood(%v, %d, %d) = %v, %v; want %v, %v", c.centers, c.depth, c.limit, got, trunc, c.want, c.trunc)
-		}
-	}
-}
 
 func TestDOTQuote(t *testing.T) {
 	if got := dotQuote(`a"b\c`); got != `"a\"b\\c"` {
@@ -192,7 +150,11 @@ func TestDrawingIsCached(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s := &server{db: db, timeout: 10 * time.Second}
+	eng, err := engine.Open(db, engine.Config{Timeout: 10 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{eng: eng}
 	k := graphKey{pkg: "a", depth: 1}
 	d1, err := s.draw(context.Background(), k)
 	if err != nil {

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "bazelex_cli_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/vnasardinov/bazelex/cmd/bazelex_cli",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//internal/cli",
+        "//internal/engine",
+        "@org_modernc_sqlite//:sqlite",
+    ],
+)
+
+go_binary(
+    name = "bazelex_cli",
+    embed = [":bazelex_cli_lib"],
+    visibility = ["//visibility:public"],
+)

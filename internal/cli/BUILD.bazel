@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cli",
+    srcs = [
+        "format.go",
+        "json.go",
+    ],
+    importpath = "github.com/vnasardinov/bazelex/internal/cli",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/engine"],
+)
+
+go_test(
+    name = "cli_test",
+    srcs = [
+        "datalog_test.go",
+        "format_test.go",
+    ],
+    embed = [":cli"],
+    deps = ["//internal/engine"],
+)

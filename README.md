@@ -1,10 +1,11 @@
 # bazelex
 
 Dumps the static target graph reported by `bazel query` into a SQLite database,
-so it can be explored with SQL (for example with the `sqlite3` CLI).
+so it can be explored with SQL (for example with the `sqlite3` CLI), from a web
+UI, or from the command line.
 
-See [Building](#building), [Running on a Bazel project](#running-on-a-bazel-project)
-and [Web UI](#web-ui) below.
+See [Building](#building), [Running on a Bazel project](#running-on-a-bazel-project),
+[Web UI](#web-ui) and [Command-line exploration](#command-line-exploration) below.
 
 Targets in external repositories are not loaded. Edges that point to them keep
 their `to_label` but have a NULL `to_id`.
@@ -140,14 +141,68 @@ Then open <http://localhost:6060>. Notes:
 * The page is plain HTML rendered by Go templates. A small script refreshes a
   single query in place, but the page works without it.
 
+## Command-line exploration
+
+`bazelex_cli` runs the same exploration engine as the web UI from the command
+line: a custom SQL query, or a [Mangle](https://github.com/google/mangle)
+(Datalog) program over the build graph. It prints Markdown for people, or JSON
+or CSV for a program such as an AI coding agent.
+
+```sh
+bazel build -c opt //cmd/bazelex_cli
+bazelex_cli sql -db graph.sqlite 'SELECT t.label, COUNT(*) AS n FROM edge e
+  JOIN target t ON t.id = e.to_id WHERE e.attr = "deps" GROUP BY t.label ORDER BY n DESC'
+
+bazelex_cli datalog -db graph.sqlite - <<'EOF'
+reachable(X, Y) :- dep(X, Y).
+reachable(X, Z) :- dep(X, Y), reachable(Y, Z).
+EOF
+```
+
+The subcommand comes first, then its flags:
+
+* `sql` runs a SQL query against the database and prints its result.
+* `datalog` evaluates a Mangle program over the facts `target/3`, `dep/2` and
+  `edge/3` (the same ones the web UI's Datalog page uses).
+
+Both take the same flags:
+
+* `-db` names a database written by `bazelex` (default `bazelex.sqlite`), opened
+  read-only. A relative path is resolved against the directory you ran the
+  command from.
+* `-format` is `md` (the default), `json` or `csv`.
+* `-limit` prints at most that many rows per table; 0, the default, prints all of
+  them.
+* `-timeout` limits how long the input may run (default 120s). `datalog` also
+  takes `-max-facts`, the number of derived facts at which evaluation stops.
+
+The query or program is the last argument. With no argument, or with `-`, it is
+read from stdin; `@file` reads it from that file, which suits a long Mangle
+program. For example, an AI coding agent can pipe a program in and get JSON back:
+
+```sh
+bazelex_cli datalog -db graph.sqlite -format json @reach.mg
+```
+
+`md` renders one Markdown table per result; `json` is a stable structured form
+(`{"columns": ..., "rows": ...}` for SQL, and `{"edb": ..., "derived": ...,
+"relations": [...]}` for Datalog); `csv` is comma-separated, with one
+`# relation` comment line before each table of a Datalog result.
+
 ## Layout
 
-* `cmd/bazelex/`: the command-line entry point (flags, running `bazel query`).
+* `cmd/bazelex/`: the loader's entry point (flags, running `bazel query`).
 * `cmd/bazelex_ui/`: the web UI entry point (flags, opening the database).
+* `cmd/bazelex_cli/`: the command-line entry point (flags, subcommands, wiring).
 * `internal/graphdb/`: the SQLite schema and the loader that turns a stream of
   query `Target` messages into rows. This is where the tests live.
-* `internal/ui/`: the web UI itself: the canned queries, the HTTP handler and the
-  page template.
+* `internal/engine/`: the exploration engine, shared by both front-ends. It runs
+  SQL, loads the graph's facts and evaluates Mangle programs, and builds the
+  package quotient graph. It has no presentation concerns.
+* `internal/cli/`: the command-line front-end: it renders the engine's results as
+  Markdown, JSON or CSV.
+* `internal/ui/`: the web UI front-end: the canned queries, the HTTP handler, the
+  page templates and the Graphviz rendering.
 * Bazel's query proto bindings (`build_proto`) come from the published
   [buildtools](https://github.com/bazel-contrib/buildtools) module
   (`github.com/bazel-contrib/buildtools/v10`). `MODULE.bazel` overrides how

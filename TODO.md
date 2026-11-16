@@ -74,6 +74,9 @@ From a code review of commit 4789c12 ("ui: add a package graph page"),
 most severe first. All line numbers are in `internal/ui/graph.go` as of
 that commit; use `git show 4789c12:internal/ui/graph.go` to see the code
 they refer to, and `git log -L` or `git blame` to follow it since.
+Since then the graph algorithms and the package graph load moved to
+`internal/engine` (`pkgraph.go`), while the DOT and Graphviz drawing stayed
+in `internal/ui`; the findings still stand, only their home changed.
 
 -   **No time bound on rendering** (line 312, `fillGraph`
     calling `renderSVG`). The query path wraps its work in `s.timeout`, but

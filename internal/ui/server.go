@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/goccy/go-graphviz"
+
+	"github.com/vnasardinov/bazelex/internal/engine"
 )
 
 const maxLabels = 20000
@@ -30,21 +32,15 @@ var indexTmpl = template.Must(template.New("index").Parse(indexHTML))
 
 // server serves one database, configured by the Config NewServer was given.
 type server struct {
-	db       *sql.DB
+	eng      *engine.Engine // runs SQL, Datalog and the package graph
 	dbName   string
 	pageRows int
 	parallel int
-	timeout  time.Duration
-
-	pkgMu sync.Mutex
-	pkgs  *pkgGraph // loaded on first use
 
 	gvMu sync.Mutex
 	gv   *graphviz.Graphviz // created on first render, never closed
 
 	drawings drawingCache // laid-out graphs, by request
-
-	facts edbCache // graph facts for the Datalog page, loaded on first use
 }
 
 // Config configures the page. PageRows, Parallel and Timeout must be positive,
@@ -76,7 +72,11 @@ func NewServer(db *sql.DB, cfg Config) (http.Handler, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	s := &server{db: db, dbName: cfg.DBName, pageRows: cfg.PageRows, parallel: cfg.Parallel, timeout: cfg.Timeout}
+	eng, err := engine.Open(db, engine.Config{Timeout: cfg.Timeout})
+	if err != nil {
+		return nil, err
+	}
+	s := &server{eng: eng, dbName: cfg.DBName, pageRows: cfg.PageRows, parallel: cfg.Parallel}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /q/{id}", s.fragment)
@@ -304,92 +304,38 @@ func pageURL(params url.Values, id string, page int) string {
 // the rows read so far are kept.
 func (s *server) run(ctx context.Context, v *queryView) (hasNext bool, err error) {
 	v.Ran = true
-	ctx, cancel := context.WithTimeout(ctx, s.timeout)
-	defer cancel()
-
 	args := make([]any, 0, len(v.Params))
 	for _, p := range v.Params {
 		args = append(args, sql.Named(p.Name, v.Values[p.Name]))
 	}
-	rows, err := s.db.QueryContext(ctx, v.SQL, args...)
+	t, hasNext, err := s.eng.QueryPage(ctx, (v.Page-1)*s.pageRows, s.pageRows, v.SQL, args...)
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
-	if v.Columns, err = rows.Columns(); err != nil {
-		return false, err
-	}
-
-	skip := (v.Page - 1) * s.pageRows
-	for rows.Next() {
-		if skip > 0 {
-			skip--
-			continue
-		}
-		// The page is full, so this row is the probe: its existence is the
-		// only thing we need from it.
-		if len(v.Rows) == s.pageRows {
-			return true, nil
-		}
-		row, err := scanRow(rows, len(v.Columns))
-		if err != nil {
-			return false, err
+	v.Columns = t.Columns
+	for _, r := range t.Rows {
+		row := make([]cell, len(r))
+		for i, x := range r {
+			row[i] = cellFor(x)
 		}
 		v.Rows = append(v.Rows, row)
 	}
-	return false, rows.Err()
-}
-
-// scanRow reads the current row of rows, which has n columns.
-func scanRow(rows *sql.Rows, n int) ([]cell, error) {
-	vals := make([]any, n)
-	ptrs := make([]any, n)
-	for i := range vals {
-		ptrs[i] = &vals[i]
-	}
-	if err := rows.Scan(ptrs...); err != nil {
-		return nil, err
-	}
-	row := make([]cell, n)
-	for i, x := range vals {
-		row[i] = cellFor(x)
-	}
-	return row, nil
+	return hasNext, nil
 }
 
 // cellFor formats a value scanned from the database. Numbers are marked so
 // they are right-aligned.
 func cellFor(x any) cell {
-	switch x := x.(type) {
-	case nil:
-		return cell{Text: "NULL"}
-	case []byte:
-		return cell{Text: string(x)}
-	case int64, float64:
-		return cell{Text: fmt.Sprint(x), Num: true}
-	default:
-		return cell{Text: fmt.Sprint(x)}
-	}
+	return cell{Text: engine.Format(x), Num: engine.IsNumber(x)}
 }
 
 // ruleLabels returns rule labels for input autocompletion. Failure only costs
 // the autocompletion, so it is logged rather than reported.
 func (s *server) ruleLabels(ctx context.Context) []string {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT label FROM target WHERE kind = 'rule' ORDER BY label LIMIT ?`, maxLabels)
+	labels, err := s.eng.RuleLabels(ctx, maxLabels)
 	if err != nil {
 		log.Printf("labels: %v", err)
 		return nil
-	}
-	defer rows.Close()
-	var labels []string
-	for rows.Next() {
-		var l string
-		if err := rows.Scan(&l); err != nil {
-			log.Printf("labels: %v", err)
-			break
-		}
-		labels = append(labels, l)
 	}
 	return labels
 }
