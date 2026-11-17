@@ -197,11 +197,11 @@ func (c *drawingCache) put(k graphKey, d *drawing) {
 	c.m[k] = d
 }
 
-// noPackageError says that a package is not in the graph, either because it
-// does not exist or because it has no dependencies across packages.
-type noPackageError string
+// nothingToDrawError says that there is no drawing for a package: it is not in
+// the graph at all, or it is a node with no dependencies across packages.
+type nothingToDrawError string
 
-func (e noPackageError) Error() string {
+func (e nothingToDrawError) Error() string {
 	return fmt.Sprintf("Package %q has no dependencies on or from other packages.", string(e))
 }
 
@@ -216,7 +216,7 @@ func (s *server) draw(ctx context.Context, k graphKey) (*drawing, error) {
 		return nil, err
 	}
 	if !g.HasEdges(k.pkg) {
-		return nil, noPackageError(k.pkg)
+		return nil, nothingToDrawError(k.pkg)
 	}
 	d := &drawing{}
 	centers := []string{k.pkg}
@@ -285,9 +285,9 @@ func (s *server) graphFile(w http.ResponseWriter, r *http.Request, ext, contentT
 		return
 	}
 	d, err := s.draw(r.Context(), k)
-	var missing noPackageError
+	var noGraph nothingToDrawError
 	switch {
-	case errors.As(err, &missing):
+	case errors.As(err, &noGraph):
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	case err != nil:

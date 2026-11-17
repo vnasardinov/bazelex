@@ -23,7 +23,7 @@ hashes differ, re-check that file's entries.
 | `internal/engine/quotient.go` | `cce7015316bc53d541bbef46c9451983db149b59` | `480cbcb736d449a766d88891b49fdbd53dddda3e` |
 | `internal/engine/quotient_test.go` | `e3b175311cf0bb550b76911e2da96a6946737571` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
 | `internal/engine/datalog.go` | `f01cac896f8cd1a1a230dd36da8f13ae398da41e` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` |
-| `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `da7a4fe41821133efced7e48a6ec0500a71adeb3` |
+| `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `1f7655703e4a136fdecee00250189dee096af309` |
 | `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `e9788fa805af21975260fe5090fc594bf846fbb6` |
 
 `internal/engine/quotient_test.go`, `internal/engine/datalog.go` and
@@ -34,21 +34,19 @@ has changed since this table was written.
 
 ## Beacon candidates
 
--   `internal/ui/graph.go:200` (`noPackageError`, found while renaming `Has`) —
-    the name promises a missing package, but the only site that raises it (line
-    218) is a package that *is* a node yet has no cross-package edge, which is
-    what `HasEdges` tests for. The doc comment already spells out the union, and
-    `internal/ui/graph_test.go:48` asserts the message, so the call site is
-    deliberate: rename the type (e.g. `noGraphError`) to match what it now
-    covers, or split the two cases into two messages. Left out of this pass
-    because it is the UI's name rather than the quotient's.
+None outstanding: the twelve candidates found in the scan are landed, and so is
+the one the scan turned up in the UI (`noPackageError` → `nothingToDrawError`).
+The sections below record what is left to know.
 
 ## Checked, not a candidate
 
 -   `internal/ui/graph.go:218` — the page asks whether a package exists and
-    reads false for a package that is a node with no cross-package edge. This is
-    what the same page's `noPackageError` documents and its message states
-    ("has no dependencies on or from other packages"), and
-    `internal/ui/graph_test.go:48` asserts it, so it is intended: a package with
-    nothing to draw is reported rather than drawn. Earlier noted as a bug while
-    renaming `Has`; not one.
+    reads false for a package that is a node with no cross-package edge. That is
+    what `nothingToDrawError` documents and its message states ("has no
+    dependencies on or from other packages"), and `internal/ui/graph_test.go:48`
+    asserts it, so it is intended: a package with nothing to draw is reported
+    rather than drawn. Earlier noted as a bug while renaming `Has`; not one.
+
+-   The one message covers both causes (a package that is not in the graph and
+    one with no cross-package edges). Splitting it into two is a wording choice
+    for whoever reads the page, not a beacon, so it is left as it is.
