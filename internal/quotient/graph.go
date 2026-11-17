@@ -4,8 +4,8 @@
 // structure, and so on.
 //
 // The building blocks are Graph, a weighted directed graph, and Partition, a
-// map from a node to the group it collapses into. Of applies a partition, and
-// Condense applies the one derived from the graph's strongly connected
+// map from a node to the group it collapses into. Collapse applies a partition,
+// and Condense applies the one derived from the graph's strongly connected
 // components, which turns any graph into a DAG.
 package quotient
 

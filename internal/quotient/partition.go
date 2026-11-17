@@ -6,12 +6,12 @@ package quotient
 // strongly connected components, is derived from the graph.
 type Partition func(node string) string
 
-// Of returns the quotient of g by part: one node per group name, and an edge
-// a -> b whose weight is the sum of the weights of the edges from a node in a
-// to a node in b. Edges whose ends fall in the same group are dropped. Groups
+// Collapse returns the quotient of g by part: one node per group name, and an
+// edge a -> b whose weight is the sum of the weights of the edges from a node in
+// a to a node in b. Edges whose ends fall in the same group are dropped. Groups
 // with no cross-group edge are kept as isolated nodes, so the quotient lists
 // every group.
-func Of(g *Graph, part Partition) *Graph {
+func Collapse(g *Graph, part Partition) *Graph {
 	q := New()
 	for _, node := range g.Nodes() {
 		from := part(node)
@@ -30,6 +30,5 @@ func Of(g *Graph, part Partition) *Graph {
 // result is always a DAG, so it has a topological order, which a cyclic graph
 // does not.
 func Condense(g *Graph) *Graph {
-	index := ComponentIndex(g)
-	return Of(g, func(node string) string { return index[node] })
+	return Collapse(g, ComponentIndex(g).Partition)
 }

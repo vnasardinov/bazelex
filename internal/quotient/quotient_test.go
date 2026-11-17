@@ -87,14 +87,14 @@ func TestNeighborhood(t *testing.T) {
 	}
 }
 
-func TestOf(t *testing.T) {
+func TestCollapse(t *testing.T) {
 	g := New()
 	g.Add("a1", "b1", 1)
 	g.Add("a2", "b1", 2)
 	g.Add("a2", "b2", 4)
 	g.Add("b1", "a1", 8) // an edge back across the partition
 	// Group by the leading letter, so a1 and a2 collapse into "a".
-	q := Of(g, func(node string) string { return node[:1] })
+	q := Collapse(g, func(node string) string { return node[:1] })
 	if got, want := q.Nodes(), []string{"a", "b"}; !slices.Equal(got, want) {
 		t.Fatalf("Nodes() = %v, want %v", got, want)
 	}
@@ -138,6 +138,10 @@ func TestComponentIndex(t *testing.T) {
 		if got[node] != name {
 			t.Errorf("ComponentIndex[%q] = %q, want %q", node, got[node], name)
 		}
+	}
+	// The names are a Partition, so Collapse takes them without a lookup.
+	if name := got.Partition("y"); name != "x" {
+		t.Errorf("Partition(y) = %q, want %q; y is in x's component", name, "x")
 	}
 }
 

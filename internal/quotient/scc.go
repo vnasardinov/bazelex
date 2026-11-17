@@ -5,13 +5,23 @@ import (
 	"slices"
 )
 
+// ComponentNames maps every node of a graph to the name of its strongly
+// connected component, as ComponentIndex computes. Naming a group per node makes
+// it a Partition, so a caller that needs the names as well as the quotient can
+// hand it to Collapse rather than write the lookup itself.
+type ComponentNames map[string]string
+
+// Partition returns the name of node's component: the group name that component
+// takes in the condensation.
+func (c ComponentNames) Partition(node string) string { return c[node] }
+
 // ComponentIndex returns, for every node of g, the name of its strongly
 // connected component. A component is named after its smallest member, which is
 // stable and human-readable, and matches how the README's cycle query names one.
 //
 // It runs Tarjan's algorithm iteratively, so that a deep graph cannot overflow
 // the goroutine stack, and visits each node and edge once: O(V + E).
-func ComponentIndex(g *Graph) map[string]string {
+func ComponentIndex(g *Graph) ComponentNames {
 	// frame is one node on the DFS stack, its successors, and how far through
 	// them the walk has come.
 	type frame struct {
@@ -22,7 +32,7 @@ func ComponentIndex(g *Graph) map[string]string {
 	index := map[string]int{}    // node -> discovery order
 	low := map[string]int{}      // node -> lowest reachable index
 	onStack := map[string]bool{} // node -> on the component stack
-	comp := map[string]string{}  // node -> component name
+	comp := ComponentNames{}     // node -> component name
 	var compStack []string       // Tarjan's stack of the open components
 	nextIndex := 0               // the discovery index handed out next
 

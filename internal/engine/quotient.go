@@ -46,8 +46,9 @@ func (e *Engine) CondensedGraph(ctx context.Context) (*quotient.Graph, map[strin
 	if err != nil {
 		return nil, nil, err
 	}
-	e.graphs.component = quotient.ComponentIndex(g)
-	e.graphs.condensed = quotient.Of(g, func(pkg string) string { return e.graphs.component[pkg] })
+	component := quotient.ComponentIndex(g)
+	e.graphs.component = component
+	e.graphs.condensed = quotient.Collapse(g, component.Partition)
 	return e.graphs.condensed, e.graphs.component, nil
 }
 
