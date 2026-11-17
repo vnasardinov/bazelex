@@ -10,13 +10,12 @@ changes behavior; each entry is a rewrite candidate. Files are named relative to
 ## Revision anchors
 
 Each candidate's line numbers were verified at the "scanned" revision shown
-below; "now" is the revision they were last re-checked against. Where a file
-moved, only identifiers changed, so the line numbers still hold; if the two
-hashes of a file differ again, re-check that file's entries.
+below; "now" is the revision they were last re-checked against. If a file's two
+hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/quotient/graph.go` | `08997bc4f0b34448e8fe7bf04a8945cc8ac28b74` | `5a2a5cc5605145d146d7ba7e864eb3233e37fd85` |
+| `internal/quotient/graph.go` | `08997bc4f0b34448e8fe7bf04a8945cc8ac28b74` | `1b6cad1f1b03e79acb56e3de642b4d32c6645504` |
 | `internal/quotient/partition.go` | `c218903cbfa3c61325e0b917ecd86c8446168e56` | `28ecc8dad5ede1d4508174a67a6085ebaa18ded0` |
 | `internal/quotient/scc.go` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` |
 | `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` | `07ace06a94f6e0f26b44a86a35702630e1f4f8da` |
@@ -25,37 +24,13 @@ hashes of a file differ again, re-check that file's entries.
 | `internal/engine/datalog.go` | `f01cac896f8cd1a1a230dd36da8f13ae398da41e` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` |
 | `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `da7a4fe41821133efced7e48a6ec0500a71adeb3` |
 
-`graph.go`, `partition.go` and the four call-site files moved when the renames
-landed (`Dep.N` → `Weight`, `Has` → `HasEdges`); `scc.go` and
-`internal/engine/quotient.go` are untouched.
+`graph.go` and `partition.go` moved when the graph.go candidates landed
+(`Dep.N` → `Weight` and `Has` → `HasEdges`, then `addDirected`, `adjacencies`,
+`Deps` built on `successors`, and `reach`/`nodeSet`); the other moves are the
+call sites of those renames. `scc.go` and `internal/engine/quotient.go` are
+untouched, so the entries for them still match the scanned revision.
 
 ## Beacon candidates
-
--   `graph.go:43-58` (`Add`) — the reader has to decode the anonymous struct
-    literal `{{g.out, from, to}, {g.in, to, from}}`, whose fields `from`/`to`
-    shadow the parameters. Extract `func (g *Graph) addDirected(adj
-    map[string]map[string]int, from, to string, weight int)` and call it twice
-    (`g.out, from, to` and `g.in, to, from`). The two directions then state
-    themselves instead of being inferred from a swapped tuple.
-
--   `graph.go:106-113` (`successors`) vs `graph.go:87-97` (`Deps`) — two accessors
-    for the same list, differing in return type (`[]string` / `[]Dep`) and sort
-    call (`slices.Sort` / `slices.SortFunc`). Define one in terms of the other
-    and name the cheap one for what it is (e.g. `successorNames`). The reader can
-    then rely on one pattern instead of checking which flavor a call site needs.
-
--   `graph.go:116` (`reach(adj, node)`) — `adj` is vague where the map is the
-    graph's out- or in-adjacency, chosen by the caller (`reach(g.in, node)`).
-    Rename to `reachable(adjacency, node)`, and consider returning a named set
-    type (`map[string]bool`) so `Component`'s two calls read as a set
-    intersection. The direction being walked becomes visible at the call site.
-
--   `graph.go:49,136,138,173` — "both directions" is spelled three different
-    ways: the struct literal in `Add`, two `reach` calls in `Component`, and the
-    slice `[]map[string]map[string]int{g.out, g.in}` in `Neighborhood`. Add one
-    named helper (e.g. `func (g *Graph) adjacency() []map[string]map[string]int`
-    or `neighbors(n)` returning both directions) and use it in all three. Each
-    site then reads as "walk the graph undirected" rather than as map plumbing.
 
 -   `scc.go:26,37` — two stacks are in play under near-synonymous names: `stack`
     is Tarjan's component stack, `work` is the DFS frame stack. Rename to

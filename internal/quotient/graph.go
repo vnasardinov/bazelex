@@ -10,7 +10,6 @@
 package quotient
 
 import (
-	"cmp"
 	"slices"
 )
 
@@ -46,19 +45,22 @@ func (g *Graph) Add(from, to string, weight int) {
 	}
 	g.nodes[from] = true
 	g.nodes[to] = true
-	for _, m := range []struct {
-		adj      map[string]map[string]int
-		from, to string
-	}{{g.out, from, to}, {g.in, to, from}} {
-		if m.adj[m.from] == nil {
-			m.adj[m.from] = map[string]int{}
-		}
-		m.adj[m.from][m.to] += weight
+	addDirected(g.out, from, to, weight)
+	addDirected(g.in, to, from, weight)
+}
+
+// addDirected adds weight to the edge from -> to of one adjacency map: g.out
+// for a forward edge, g.in for a backward one. Splitting the two lets Add name
+// the direction it records instead of swapping a tuple of maps and names.
+func addDirected(adj map[string]map[string]int, from, to string, weight int) {
+	if adj[from] == nil {
+		adj[from] = map[string]int{}
 	}
+	adj[from][to] += weight
 }
 
 // HasEdges reports whether node is an endpoint of an edge, in either direction.
-// A node with no edge, such as one added by AddNode alone, reports false; Use
+// A node with no edge, such as one added by AddNode alone, reports false; use
 // Nodes for membership.
 func (g *Graph) HasEdges(node string) bool {
 	_, o := g.out[node]
@@ -83,16 +85,16 @@ type Dep struct {
 }
 
 // Deps returns the nodes from points at, in name order, or nil if it points at
-// none.
+// none. It is successors with the edge weights attached.
 func (g *Graph) Deps(from string) []Dep {
-	if len(g.out[from]) == 0 {
+	succ := g.successors(from)
+	if len(succ) == 0 {
 		return nil
 	}
-	deps := make([]Dep, 0, len(g.out[from]))
-	for to, n := range g.out[from] {
-		deps = append(deps, Dep{To: to, Weight: n})
+	deps := make([]Dep, 0, len(succ))
+	for _, to := range succ {
+		deps = append(deps, Dep{To: to, Weight: g.out[from][to]})
 	}
-	slices.SortFunc(deps, func(a, b Dep) int { return cmp.Compare(a.To, b.To) })
 	return deps
 }
 
@@ -101,8 +103,15 @@ func (g *Graph) Weight(from, to string) int {
 	return g.out[from][to]
 }
 
-// successors returns the nodes from points at, in name order. The SCC pass
-// walks it, so it is kept unexported and allocation-light.
+// adjacencies returns the graph's adjacency maps, forward (out) then backward
+// (in): the directions a walk that ignores edge direction ranges over.
+func (g *Graph) adjacencies() [2]map[string]map[string]int {
+	return [2]map[string]map[string]int{g.out, g.in}
+}
+
+// successors returns the names from points at, in name order. The SCC pass walks
+// it, so it is kept unexported and allocation-light; Deps is this list with the
+// weights attached.
 func (g *Graph) successors(from string) []string {
 	succ := make([]string, 0, len(g.out[from]))
 	for to := range g.out[from] {
@@ -112,14 +121,31 @@ func (g *Graph) successors(from string) []string {
 	return succ
 }
 
-// reach returns the nodes reachable from node (including node) along adj.
-func reach(adj map[string]map[string]int, node string) map[string]bool {
-	seen := map[string]bool{node: true}
+// nodeSet is a set of node names, such as the nodes reachable from one of them.
+type nodeSet map[string]bool
+
+// intersect returns the names in both s and other, in name order, or nil if
+// there are none.
+func (s nodeSet) intersect(other nodeSet) []string {
+	var shared []string
+	for n := range s {
+		if other[n] {
+			shared = append(shared, n)
+		}
+	}
+	slices.Sort(shared)
+	return shared
+}
+
+// reach returns the set of nodes reachable from node (including node) along
+// adjacency: g.out for dependencies, g.in for dependents.
+func reach(adjacency map[string]map[string]int, node string) nodeSet {
+	seen := nodeSet{node: true}
 	stack := []string{node}
 	for len(stack) > 0 {
 		n := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		for m := range adj[n] {
+		for m := range adjacency[n] {
 			if !seen[m] {
 				seen[m] = true
 				stack = append(stack, m)
@@ -129,19 +155,11 @@ func reach(adj map[string]map[string]int, node string) map[string]bool {
 	return seen
 }
 
-// Component returns the nodes in node's strongly connected component: those
-// that reach it and are reached from it. It is just {node} if node is in no
-// cycle, or is not part of the graph at all.
+// Component returns the nodes in node's strongly connected component: those it
+// reaches and that reach it. It is just {node} if node is in no cycle, or is
+// not part of the graph at all.
 func (g *Graph) Component(node string) []string {
-	back := reach(g.in, node)
-	var comp []string
-	for n := range reach(g.out, node) {
-		if back[n] {
-			comp = append(comp, n)
-		}
-	}
-	slices.Sort(comp)
-	return comp
+	return reach(g.out, node).intersect(reach(g.in, node))
 }
 
 // Neighborhood returns the nodes within depth edges of any of centers,
@@ -170,7 +188,7 @@ func (g *Graph) Neighborhood(centers []string, depth, limit int) (nodes []string
 		}
 		var next []string
 		for _, n := range frontier {
-			for _, adj := range []map[string]map[string]int{g.out, g.in} {
+			for _, adj := range g.adjacencies() {
 				for m := range adj[n] {
 					if !seen[m] {
 						seen[m] = true
