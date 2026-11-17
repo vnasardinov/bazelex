@@ -1,4 +1,0 @@
-When generating or executing git commits, always append a
-`Co-authored-by` trailer at the bottom of the commit message after a
-blank line, identifying Cline and the active model, which is deepseek-v4.1-flash
-at present.
