@@ -12,42 +12,42 @@ import (
 // It runs Tarjan's algorithm iteratively, so that a deep graph cannot overflow
 // the goroutine stack, and visits each node and edge once: O(V + E).
 func ComponentIndex(g *Graph) map[string]string {
-	// frame is one node on the DFS stack and its place in that node's list of
-	// successors; next is how far we have walked.
+	// frame is one node on the DFS stack, its successors, and how far through
+	// them the walk has come.
 	type frame struct {
-		node string
-		succ []string
-		next int
+		node   string
+		succ   []string
+		succIx int
 	}
 	index := map[string]int{}    // node -> discovery order
 	low := map[string]int{}      // node -> lowest reachable index
 	onStack := map[string]bool{} // node -> on the component stack
 	comp := map[string]string{}  // node -> component name
-	var stack []string           // Tarjan's component stack
-	counter := 0
+	var compStack []string       // Tarjan's stack of the open components
+	nextIndex := 0               // the discovery index handed out next
 
 	for _, root := range g.Nodes() {
 		if _, done := index[root]; done {
 			continue
 		}
-		index[root], low[root] = counter, counter
-		counter++
-		stack = append(stack, root)
+		index[root], low[root] = nextIndex, nextIndex
+		nextIndex++
+		compStack = append(compStack, root)
 		onStack[root] = true
-		work := []frame{{node: root, succ: g.successors(root)}}
-		for len(work) > 0 {
-			f := &work[len(work)-1]
-			if f.next < len(f.succ) {
-				w := f.succ[f.next]
-				f.next++
+		frames := []frame{{node: root, succ: g.successors(root)}}
+		for len(frames) > 0 {
+			f := &frames[len(frames)-1]
+			if f.succIx < len(f.succ) {
+				w := f.succ[f.succIx]
+				f.succIx++
 				switch wi, seen := index[w]; {
 				case !seen:
 					// A tree edge: descend into w.
-					index[w], low[w] = counter, counter
-					counter++
-					stack = append(stack, w)
+					index[w], low[w] = nextIndex, nextIndex
+					nextIndex++
+					compStack = append(compStack, w)
 					onStack[w] = true
-					work = append(work, frame{node: w, succ: g.successors(w)})
+					frames = append(frames, frame{node: w, succ: g.successors(w)})
 				case onStack[w]:
 					// A back edge to a node still on the stack: w is in the
 					// current component.
@@ -57,17 +57,17 @@ func ComponentIndex(g *Graph) map[string]string {
 			}
 			// Every successor of v is done; close it out.
 			v := f.node
-			work = work[:len(work)-1]
-			if len(work) > 0 {
-				parent := work[len(work)-1].node
+			frames = frames[:len(frames)-1]
+			if len(frames) > 0 {
+				parent := frames[len(frames)-1].node
 				low[parent] = min(low[parent], low[v])
 			}
 			if low[v] == index[v] {
 				// v roots a component: pop it and everything above it.
 				var members []string
 				for {
-					w := stack[len(stack)-1]
-					stack = stack[:len(stack)-1]
+					w := compStack[len(compStack)-1]
+					compStack = compStack[:len(compStack)-1]
 					onStack[w] = false
 					members = append(members, w)
 					if w == v {
@@ -88,12 +88,12 @@ func ComponentIndex(g *Graph) map[string]string {
 // of member names, in order of the components' names (their smallest member).
 func Components(g *Graph) [][]string {
 	index := ComponentIndex(g)
-	byName := map[string][]string{}
+	membersByName := map[string][]string{}
 	for node, name := range index {
-		byName[name] = append(byName[name], node)
+		membersByName[name] = append(membersByName[name], node)
 	}
-	comps := make([][]string, 0, len(byName))
-	for _, members := range byName {
+	comps := make([][]string, 0, len(membersByName))
+	for _, members := range membersByName {
 		slices.Sort(members)
 		comps = append(comps, members)
 	}
