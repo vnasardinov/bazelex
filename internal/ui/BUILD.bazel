@@ -17,6 +17,7 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/engine",
+        "//internal/quotient",
         "@com_github_goccy_go_graphviz//:go-graphviz",
     ],
 )

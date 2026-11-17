@@ -21,7 +21,7 @@ import (
 
 	"github.com/goccy/go-graphviz"
 
-	"github.com/vnasardinov/bazelex/internal/engine"
+	"github.com/vnasardinov/bazelex/internal/quotient"
 )
 
 const (
@@ -40,7 +40,7 @@ var graphTmpl = template.Must(template.New("graph").Parse(graphHTML))
 
 // dot returns the DOT source for the subgraph induced by nodes. centers are
 // filled gold, and members of the cycle red. Each node links to link(pkg).
-func dot(g *engine.PkgGraph, nodes, centers, cycle []string, link func(pkg string) string) string {
+func dot(g *quotient.Graph, nodes, centers, cycle []string, link func(pkg string) string) string {
 	in := map[string]bool{}
 	for _, p := range nodes {
 		in[p] = true

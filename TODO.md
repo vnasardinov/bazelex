@@ -74,9 +74,11 @@ From a code review of commit 4789c12 ("ui: add a package graph page"),
 most severe first. All line numbers are in `internal/ui/graph.go` as of
 that commit; use `git show 4789c12:internal/ui/graph.go` to see the code
 they refer to, and `git log -L` or `git blame` to follow it since.
-Since then the graph algorithms and the package graph load moved to
-`internal/engine` (`pkgraph.go`), while the DOT and Graphviz drawing stayed
-in `internal/ui`; the findings still stand, only their home changed.
+Since then the graph algorithms moved to `internal/quotient` and the package
+graph load to `internal/engine` (`quotient.go`), while the DOT and Graphviz
+drawing stayed in `internal/ui`; the findings still stand, only their home
+changed. (The quadratic-BFS finding below is already fixed: the neighborhood
+walk now deduplicates with a set.)
 
 -   **No time bound on rendering** (line 312, `fillGraph`
     calling `renderSVG`). The query path wraps its work in `s.timeout`, but
@@ -192,6 +194,16 @@ most.
     exactly where those hidden cycles are. This is one of the most
     useful quotients because the condensation is always a DAG, so you
     get a clean topological layering for free.
+    -   Done: the condensation is computed in Go (Tarjan, iterative) by
+        `internal/quotient` and exposed by `Engine.CondensedGraph`. It
+        is offered to Datalog as facts on the `/datalog` page (and the
+        CLI): `qmember("scc", Component, Package)` maps each package to
+        its component, named after its smallest member, and
+        `qedge("scc", From, To, N)` is the component graph. The generic
+        quotient facts are `qnode`/`qedge`/`qmember`, parameterized by
+        the quotient name, so the package quotient rides along.
+    -   Next: SQL support (no `/graph?by=scc` yet) and drawing the
+        condensed graph; and a topological layering of the components.
 -   **By transitive-dependency signature.** Group targets with identical
     (or nearly identical) transitive closures. These are targets that
     are effectively interchangeable from the build's point of view,

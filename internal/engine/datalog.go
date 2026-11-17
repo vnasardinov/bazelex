@@ -12,6 +12,8 @@ import (
 	"github.com/google/mangle/engine"
 	"github.com/google/mangle/factstore"
 	"github.com/google/mangle/parse"
+
+	"github.com/vnasardinov/bazelex/internal/quotient"
 )
 
 // The extensional predicates loaded from the database. Labels, kinds and
@@ -23,6 +25,14 @@ var (
 	targetPred = ast.PredicateSym{Symbol: "target", Arity: 3} // label, kind, package
 	depPred    = ast.PredicateSym{Symbol: "dep", Arity: 2}    // from, to (rule_dep: deps and embed)
 	edgePred   = ast.PredicateSym{Symbol: "edge", Arity: 3}   // from, to, attribute
+
+	// The quotient graphs of the build graph, named by their first argument:
+	// "package" is the package quotient, and "scc" is its strongly connected
+	// components, so a program can reason at package or component granularity
+	// instead of at the rule granularity of dep and edge.
+	qnodePred   = ast.PredicateSym{Symbol: "qnode", Arity: 2}   // quotient, node
+	qedgePred   = ast.PredicateSym{Symbol: "qedge", Arity: 4}   // quotient, from, to, weight
+	qmemberPred = ast.PredicateSym{Symbol: "qmember", Arity: 3} // quotient, node, member
 )
 
 // edbCache holds the graph's facts, built once from the read-only database.
@@ -112,7 +122,47 @@ func (e *Engine) datalogFacts(ctx context.Context) ([]ast.Atom, error) {
 			return nil, err
 		}
 	}
+	q, err := e.quotientAtoms(ctx)
+	if err != nil {
+		return nil, err
+	}
+	atoms = append(atoms, q...)
 	e.facts.atoms = atoms
+	return atoms, nil
+}
+
+// quotientAtoms returns the quotient graphs as facts: qnode and qedge describe
+// each quotient, and qmember says which package collapses into which component
+// of the condensation. The underlying facts come from PackageGraph and
+// CondensedGraph, so a program can reason over packages or over dependency
+// cycles without re-deriving them itself.
+func (e *Engine) quotientAtoms(ctx context.Context) ([]ast.Atom, error) {
+	pkg, err := e.PackageGraph(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cond, component, err := e.CondensedGraph(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var atoms []ast.Atom
+	for _, g := range []struct {
+		name  string
+		graph *quotient.Graph
+	}{{"package", pkg}, {"scc", cond}} {
+		for _, n := range g.graph.Nodes() {
+			atoms = append(atoms, ast.NewAtom(qnodePred.Symbol, ast.String(g.name), ast.String(n)))
+		}
+		for _, from := range g.graph.Nodes() {
+			for _, d := range g.graph.Deps(from) {
+				atoms = append(atoms, ast.NewAtom(qedgePred.Symbol, ast.String(g.name), ast.String(from), ast.String(d.To), ast.Number(int64(d.N))))
+			}
+		}
+	}
+	// Packages come sorted, so the members are emitted deterministically.
+	for _, p := range pkg.Nodes() {
+		atoms = append(atoms, ast.NewAtom(qmemberPred.Symbol, ast.String("scc"), ast.String(component[p]), ast.String(p)))
+	}
 	return atoms, nil
 }
 
@@ -140,7 +190,7 @@ func evalDatalog(program string, edb []ast.Atom, limit int) (*DatalogResult, err
 		}
 	}
 	extra := map[ast.PredicateSym]ast.Decl{}
-	for _, sym := range []ast.PredicateSym{targetPred, depPred, edgePred} {
+	for _, sym := range []ast.PredicateSym{targetPred, depPred, edgePred, qnodePred, qedgePred, qmemberPred} {
 		if !defined[sym] {
 			extra[sym] = ast.NewSyntheticDeclFromSym(sym)
 		}

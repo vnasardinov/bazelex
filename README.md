@@ -108,11 +108,15 @@ into facts: `target(Label, Kind, Package)`, `dep(From, To)` (rule-to-rule `deps`
 and `embed`, as above) and `edge(From, To, Attr)` (every dependency edge).
 Labels are Mangle *string* constants, so a program writes
 `dep("//foo:bar", X)` rather than `dep(//foo:bar, X)`: a Bazel label's leading
-`//` is not a valid name constant. The page offers two examples, transitive
-dependencies (recursion) and the rules nothing depends on (negation), and it
-renders every relation the program derives. A program may derive at most 500k
-facts before evaluation stops with an error, and each table shows its first 200
-rows.
+`//` is not a valid name constant. Alongside the raw graph, the engine collapses
+it into quotient graphs and loads those as facts too: `qnode(Quotient, Node)`,
+`qedge(Quotient, From, To, Weight)` and `qmember(Quotient, Node, Member)`, where
+the quotient is `"package"` or `"scc"`, the strongly connected components of the
+package graph. The page offers three examples, transitive dependencies
+(recursion), the rules nothing depends on (negation) and the hidden dependency
+cycles, and it renders every relation the program derives. A program may derive
+at most 500k facts before evaluation stops with an error, and each table shows
+its first 200 rows.
 
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite
@@ -162,8 +166,9 @@ EOF
 The subcommand comes first, then its flags:
 
 * `sql` runs a SQL query against the database and prints its result.
-* `datalog` evaluates a Mangle program over the facts `target/3`, `dep/2` and
-  `edge/3` (the same ones the web UI's Datalog page uses).
+* `datalog` evaluates a Mangle program over the facts `target/3`, `dep/2`,
+  `edge/3` and the quotient facts `qnode/2`, `qedge/4` and `qmember/3` (the same
+  ones the web UI's Datalog page uses).
 
 Both take the same flags:
 
@@ -197,8 +202,12 @@ bazelex_cli datalog -db graph.sqlite -format json @reach.mg
 * `internal/graphdb/`: the SQLite schema and the loader that turns a stream of
   query `Target` messages into rows. This is where the tests live.
 * `internal/engine/`: the exploration engine, shared by both front-ends. It runs
-  SQL, loads the graph's facts and evaluates Mangle programs, and builds the
-  package quotient graph. It has no presentation concerns.
+  SQL, loads the graph's facts and evaluates Mangle programs, and exposes the
+  build graph's quotient graphs (the package graph and its SCC condensation) as
+  facts. It has no presentation concerns.
+* `internal/quotient/`: quotient graphs of the build graph: a weighted digraph,
+  a partition that collapses nodes into groups, and the strongly connected
+  components (Tarjan) that condense the package graph into a DAG.
 * `internal/cli/`: the command-line front-end: it renders the engine's results as
   Markdown, JSON or CSV.
 * `internal/ui/`: the web UI front-end: the canned queries, the HTTP handler, the

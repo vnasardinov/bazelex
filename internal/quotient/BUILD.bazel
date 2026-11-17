@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "quotient",
+    srcs = [
+        "graph.go",
+        "partition.go",
+        "scc.go",
+    ],
+    importpath = "github.com/vnasardinov/bazelex/internal/quotient",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "quotient_test",
+    srcs = ["quotient_test.go"],
+    embed = [":quotient"],
+)

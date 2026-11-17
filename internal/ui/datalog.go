@@ -44,6 +44,18 @@ reachable(X, Z) :- dep(X, Y), reachable(Y, Z).
 leaf(X) :- target(X, "rule", _), !needed(X).
 `,
 	},
+	{
+		Title:       "Hidden dependency cycles",
+		Description: `Bazel forbids cycles among targets, not among packages. The quotient facts expose the graph at other granularities: qmember("scc", Component, Package) groups packages by dependency cycle, and qedge("scc", From, To, N) is the component graph you get by collapsing each cycle, which is always acyclic.`,
+		Program: `# Which dependency cycle a package belongs to; a component with more
+# than one package is a cycle that the target graph hides.
+in_component(Pkg, Node) :- qmember("scc", Node, Pkg).
+
+# Dependencies between components, i.e. the package graph with each
+# dependency cycle collapsed to a single node.
+component_dep(From, To) :- qedge("scc", From, To, _).
+`,
+	},
 }
 
 // datalogView is what datalog.html renders.

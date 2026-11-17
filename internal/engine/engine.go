@@ -55,15 +55,15 @@ func (c Config) Validate() error {
 
 // Engine runs exploration queries over one database. It is safe for concurrent
 // use: the database must be opened read-only, so concurrent readers are fine,
-// and the caches it keeps (graph facts, the package quotient graph) are built
-// once and never change.
+// and the caches it keeps (graph facts, the quotient graphs) are built once and
+// never change.
 type Engine struct {
 	db       *sql.DB
 	timeout  time.Duration
 	maxFacts int
 
-	facts edbCache // graph facts for Datalog, loaded on first use (datalog.go)
-	pkgs  pkgCache // the package quotient graph, loaded on first use (pkgraph.go)
+	facts  edbCache   // graph facts for Datalog, loaded on first use (datalog.go)
+	graphs graphCache // quotient graphs of the build graph (quotient.go)
 }
 
 // Open returns an Engine over db, which must be a database written by bazelex.

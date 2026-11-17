@@ -22,7 +22,10 @@
 in <code>{{.DB}}</code>. The facts loaded are <code>target(Label, Kind, Package)</code>,
 <code>dep(From, To)</code> (rule-to-rule <code>deps</code> and <code>embed</code>, as elsewhere) and
 <code>edge(From, To, Attr)</code> (every dependency edge). Labels are strings, so write
-<code>dep("//foo:bar", X)</code>.</p>
+<code>dep("//foo:bar", X)</code>. The quotient graphs are <code>qnode(Q, Node)</code>,
+<code>qedge(Q, From, To, Weight)</code> and <code>qmember(Q, Node, Member)</code>, where the
+quotient <code>Q</code> is <code>"package"</code> or <code>"scc"</code> (the strongly connected
+components of the package graph, named after their smallest package).</p>
 
 <h2>Examples</h2>
 <ul>

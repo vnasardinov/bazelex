@@ -5,11 +5,12 @@ go_library(
     srcs = [
         "datalog.go",
         "engine.go",
-        "pkgraph.go",
+        "quotient.go",
     ],
     importpath = "github.com/vnasardinov/bazelex/internal/engine",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/quotient",
         "@com_github_google_mangle//analysis",
         "@com_github_google_mangle//ast",
         "@com_github_google_mangle//engine",
@@ -23,11 +24,12 @@ go_test(
     srcs = [
         "datalog_test.go",
         "engine_test.go",
-        "pkgraph_test.go",
+        "quotient_test.go",
     ],
     embed = [":engine"],
     deps = [
         "//internal/graphdb",
+        "//internal/quotient",
         "@com_github_google_mangle//ast",
         "@org_modernc_sqlite//:sqlite",
     ],
