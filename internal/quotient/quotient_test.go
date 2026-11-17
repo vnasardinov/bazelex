@@ -31,7 +31,7 @@ func TestAddAndWeight(t *testing.T) {
 	if got := g.Weight("y", "w"); got != 0 {
 		t.Errorf("Weight of a missing edge = %d, want 0", got)
 	}
-	if !g.Has("z") || g.Has("nope") {
+	if !g.HasEdges("z") || g.HasEdges("nope") {
 		t.Error("Has misclassified a node")
 	}
 }
@@ -47,7 +47,7 @@ func TestNodes(t *testing.T) {
 
 func TestDeps(t *testing.T) {
 	g := testGraph()
-	if got, want := g.Deps("y"), []Dep{{To: "x", N: 1}, {To: "z", N: 1}}; !slices.Equal(got, want) {
+	if got, want := g.Deps("y"), []Dep{{To: "x", Weight: 1}, {To: "z", Weight: 1}}; !slices.Equal(got, want) {
 		t.Errorf("Deps(y) = %v, want %v", got, want)
 	}
 	if got := g.Deps("w"); got != nil {
@@ -98,10 +98,10 @@ func TestOf(t *testing.T) {
 	if got, want := q.Nodes(), []string{"a", "b"}; !slices.Equal(got, want) {
 		t.Fatalf("Nodes() = %v, want %v", got, want)
 	}
-	if got, want := q.Deps("a"), []Dep{{To: "b", N: 7}}; !slices.Equal(got, want) {
+	if got, want := q.Deps("a"), []Dep{{To: "b", Weight: 7}}; !slices.Equal(got, want) {
 		t.Errorf("Deps(a) = %v, want %v", got, want)
 	}
-	if got, want := q.Deps("b"), []Dep{{To: "a", N: 8}}; !slices.Equal(got, want) {
+	if got, want := q.Deps("b"), []Dep{{To: "a", Weight: 8}}; !slices.Equal(got, want) {
 		t.Errorf("Deps(b) = %v, want %v", got, want)
 	}
 }
@@ -113,10 +113,10 @@ func TestCondense(t *testing.T) {
 	if got, want := q.Nodes(), []string{"w", "x", "z"}; !slices.Equal(got, want) {
 		t.Fatalf("Nodes() = %v, want %v", got, want)
 	}
-	if got, want := q.Deps("x"), []Dep{{To: "z", N: 1}}; !slices.Equal(got, want) {
+	if got, want := q.Deps("x"), []Dep{{To: "z", Weight: 1}}; !slices.Equal(got, want) {
 		t.Errorf("Deps(x) = %v, want %v", got, want)
 	}
-	if got, want := q.Deps("z"), []Dep{{To: "w", N: 1}}; !slices.Equal(got, want) {
+	if got, want := q.Deps("z"), []Dep{{To: "w", Weight: 1}}; !slices.Equal(got, want) {
 		t.Errorf("Deps(z) = %v, want %v", got, want)
 	}
 	// The condensation must be acyclic: no node reaches itself.

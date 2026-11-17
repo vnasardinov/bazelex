@@ -9,45 +9,27 @@ changes behavior; each entry is a rewrite candidate. Files are named relative to
 
 ## Revision anchors
 
-Every line number below was verified against, and is pinned to, these revisions
-(git blob hashes at commit `a5441f0` "engine: add a quotient package and SCC
-condensation"). The working tree matches them exactly at the time of writing
-(`git hash-object` equals `git rev-parse HEAD:<file>` for each), so a mismatch
-means the file moved and the line numbers need re-checking.
+Each candidate's line numbers were verified at the "scanned" revision shown
+below; "now" is the revision they were last re-checked against. Where a file
+moved, only identifiers changed, so the line numbers still hold; if the two
+hashes of a file differ again, re-check that file's entries.
 
-Scanned package:
-
-| file | blob hash | lines |
+| file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/quotient/graph.go` | `08997bc4f0b34448e8fe7bf04a8945cc8ac28b74` | 183 |
-| `internal/quotient/partition.go` | `c218903cbfa3c61325e0b917ecd86c8446168e56` | 35 |
-| `internal/quotient/scc.go` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` | 102 |
+| `internal/quotient/graph.go` | `08997bc4f0b34448e8fe7bf04a8945cc8ac28b74` | `5a2a5cc5605145d146d7ba7e864eb3233e37fd85` |
+| `internal/quotient/partition.go` | `c218903cbfa3c61325e0b917ecd86c8446168e56` | `28ecc8dad5ede1d4508174a67a6085ebaa18ded0` |
+| `internal/quotient/scc.go` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` |
+| `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` | `07ace06a94f6e0f26b44a86a35702630e1f4f8da` |
+| `internal/engine/quotient.go` | `cce7015316bc53d541bbef46c9451983db149b59` | `cce7015316bc53d541bbef46c9451983db149b59` |
+| `internal/engine/quotient_test.go` | `e3b175311cf0bb550b76911e2da96a6946737571` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
+| `internal/engine/datalog.go` | `f01cac896f8cd1a1a230dd36da8f13ae398da41e` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` |
+| `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `da7a4fe41821133efced7e48a6ec0500a71adeb3` |
 
-Supporting call sites the entries refer to:
-
-| file | blob hash |
-| --- | --- |
-| `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` |
-| `internal/engine/quotient.go` | `cce7015316bc53d541bbef46c9451983db149b59` |
-| `internal/engine/quotient_test.go` | `e3b175311cf0bb550b76911e2da96a6946737571` |
-| `internal/engine/datalog.go` | `f01cac896f8cd1a1a230dd36da8f13ae398da41e` |
-| `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` |
+`graph.go`, `partition.go` and the four call-site files moved when the renames
+landed (`Dep.N` → `Weight`, `Has` → `HasEdges`); `scc.go` and
+`internal/engine/quotient.go` are untouched.
 
 ## Beacon candidates
-
--   `graph.go:80` (`Dep.N`) — the field's meaning ("the edge's weight", per the
-    doc on line 77) is only in the comment, and read sites say `d.N`
-    (`graph.go:91` builds it; `partition.go:21`, `internal/engine/datalog.go:158`,
-    `internal/ui/graph.go:67` twice) while tests write `Dep{N: 1}`
-    (`quotient_test.go:50,101,104,116,119`,
-    `internal/engine/quotient_test.go:72-75,94`). Rename to `Weight`. The reader then
-    knows the value's meaning at every use site, not just at the declaration.
-
--   `graph.go:61` (`Has`) — the name promises "is a node", but the body reports
-    having an edge in either direction, so `AddNode`-only nodes answer false.
-    Rename to `HasEdges` (or make it cover `g.nodes`). Either way the answer to
-    "does this graph contain x?" stops depending on which method the reader
-    picked.
 
 -   `graph.go:43-58` (`Add`) — the reader has to decode the anonymous struct
     literal `{{g.out, from, to}, {g.in, to, from}}`, whose fields `from`/`to`
@@ -56,19 +38,19 @@ Supporting call sites the entries refer to:
     (`g.out, from, to` and `g.in, to, from`). The two directions then state
     themselves instead of being inferred from a swapped tuple.
 
--   `graph.go:104-111` (`successors`) vs `graph.go:85-95` (`Deps`) — two accessors
+-   `graph.go:106-113` (`successors`) vs `graph.go:87-97` (`Deps`) — two accessors
     for the same list, differing in return type (`[]string` / `[]Dep`) and sort
     call (`slices.Sort` / `slices.SortFunc`). Define one in terms of the other
     and name the cheap one for what it is (e.g. `successorNames`). The reader can
     then rely on one pattern instead of checking which flavor a call site needs.
 
--   `graph.go:114` (`reach(adj, node)`) — `adj` is vague where the map is the
+-   `graph.go:116` (`reach(adj, node)`) — `adj` is vague where the map is the
     graph's out- or in-adjacency, chosen by the caller (`reach(g.in, node)`).
     Rename to `reachable(adjacency, node)`, and consider returning a named set
     type (`map[string]bool`) so `Component`'s two calls read as a set
     intersection. The direction being walked becomes visible at the call site.
 
--   `graph.go:49,134,136,171` — "both directions" is spelled three different
+-   `graph.go:49,136,138,173` — "both directions" is spelled three different
     ways: the struct literal in `Add`, two `reach` calls in `Component`, and the
     slice `[]map[string]map[string]int{g.out, g.in}` in `Neighborhood`. Add one
     named helper (e.g. `func (g *Graph) adjacency() []map[string]map[string]int`
@@ -107,3 +89,11 @@ Supporting call sites the entries refer to:
 -   `scc.go:91` (`byName`) — the name does not say the values are component
     members grouped by component name. Rename to `membersByName`. The grouping
     that `Components` performs is then visible without reading the append.
+
+-   `internal/ui/graph.go:218` (found while renaming `Has`) — the page asks
+    whether a package exists with `g.HasEdges(k.pkg)`, so a package that is a
+    node but has no cross-package edge (like the fixture in
+    `internal/engine/quotient_test.go:58-70`) is reported as missing. Give
+    `Graph` a membership accessor (`HasNode`) and use it here. The call site then
+    asks the question it means, and the UI stops hiding edge-less packages; the
+    result changes for those packages, so it wants its own test.

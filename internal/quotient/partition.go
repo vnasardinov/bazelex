@@ -18,7 +18,7 @@ func Of(g *Graph, part Partition) *Graph {
 		q.AddNode(from)
 		for _, d := range g.Deps(node) {
 			if to := part(d.To); to != from {
-				q.Add(from, to, d.N)
+				q.Add(from, to, d.Weight)
 			}
 		}
 	}

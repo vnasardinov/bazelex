@@ -55,7 +55,7 @@ func TestPackageGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g.Has("p") {
+	if g.HasEdges("p") {
 		t.Error("the fixture has no cross-package edges")
 	}
 	if got, want := g.Nodes(), []string{"p"}; !slices.Equal(got, want) {
@@ -70,9 +70,9 @@ func TestPackageGraphEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]quotient.Dep{
-		"a": {{To: "b", N: 1}},
-		"b": {{To: "a", N: 1}},
-		"c": {{To: "b", N: 1}},
+		"a": {{To: "b", Weight: 1}},
+		"b": {{To: "a", Weight: 1}},
+		"c": {{To: "b", Weight: 1}},
 	}
 	for pkg, deps := range want {
 		if got := g.Deps(pkg); !slices.Equal(got, deps) {
@@ -91,7 +91,7 @@ func TestCondensedGraph(t *testing.T) {
 	if got, want := cond.Nodes(), []string{"a", "c"}; !slices.Equal(got, want) {
 		t.Fatalf("Nodes() = %v, want %v", got, want)
 	}
-	if got, want := cond.Deps("c"), []quotient.Dep{{To: "a", N: 1}}; !slices.Equal(got, want) {
+	if got, want := cond.Deps("c"), []quotient.Dep{{To: "a", Weight: 1}}; !slices.Equal(got, want) {
 		t.Errorf("Deps(c) = %v, want %v", got, want)
 	}
 	if want := map[string]string{"a": "a", "b": "a", "c": "c"}; !maps.Equal(component, want) {

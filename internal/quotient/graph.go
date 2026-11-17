@@ -57,8 +57,10 @@ func (g *Graph) Add(from, to string, weight int) {
 	}
 }
 
-// Has reports whether node has an edge in either direction.
-func (g *Graph) Has(node string) bool {
+// HasEdges reports whether node is an endpoint of an edge, in either direction.
+// A node with no edge, such as one added by AddNode alone, reports false; Use
+// Nodes for membership.
+func (g *Graph) HasEdges(node string) bool {
 	_, o := g.out[node]
 	_, i := g.in[node]
 	return o || i
@@ -76,8 +78,8 @@ func (g *Graph) Nodes() []string {
 
 // Dep is one outgoing edge: the node it points at and the edge's weight.
 type Dep struct {
-	To string
-	N  int
+	To     string
+	Weight int
 }
 
 // Deps returns the nodes from points at, in name order, or nil if it points at
@@ -88,7 +90,7 @@ func (g *Graph) Deps(from string) []Dep {
 	}
 	deps := make([]Dep, 0, len(g.out[from]))
 	for to, n := range g.out[from] {
-		deps = append(deps, Dep{To: to, N: n})
+		deps = append(deps, Dep{To: to, Weight: n})
 	}
 	slices.SortFunc(deps, func(a, b Dep) int { return cmp.Compare(a.To, b.To) })
 	return deps

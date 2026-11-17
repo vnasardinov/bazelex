@@ -64,7 +64,7 @@ func dot(g *quotient.Graph, nodes, centers, cycle []string, link func(pkg string
 			}
 			// Edge labels would each become a layout node and make the layout
 			// several times slower, so the weight is the line width and tooltip.
-			attrs := fmt.Sprintf("penwidth=%.1f, tooltip=%s", 1+math.Log10(float64(d.N)), dotQuote(fmt.Sprintf("%s -> %s: %d dependencies", pkgName(from), pkgName(d.To), d.N)))
+			attrs := fmt.Sprintf("penwidth=%.1f, tooltip=%s", 1+math.Log10(float64(d.Weight)), dotQuote(fmt.Sprintf("%s -> %s: %d dependencies", pkgName(from), pkgName(d.To), d.Weight)))
 			if slices.Contains(cycle, from) && slices.Contains(cycle, d.To) {
 				attrs += ", color=red"
 			}
@@ -215,7 +215,7 @@ func (s *server) draw(ctx context.Context, k graphKey) (*drawing, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !g.Has(k.pkg) {
+	if !g.HasEdges(k.pkg) {
 		return nil, noPackageError(k.pkg)
 	}
 	d := &drawing{}

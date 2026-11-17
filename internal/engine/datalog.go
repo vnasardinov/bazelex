@@ -155,7 +155,7 @@ func (e *Engine) quotientAtoms(ctx context.Context) ([]ast.Atom, error) {
 		}
 		for _, from := range g.graph.Nodes() {
 			for _, d := range g.graph.Deps(from) {
-				atoms = append(atoms, ast.NewAtom(qedgePred.Symbol, ast.String(g.name), ast.String(from), ast.String(d.To), ast.Number(int64(d.N))))
+				atoms = append(atoms, ast.NewAtom(qedgePred.Symbol, ast.String(g.name), ast.String(from), ast.String(d.To), ast.Number(int64(d.Weight))))
 			}
 		}
 	}
