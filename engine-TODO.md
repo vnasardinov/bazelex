@@ -25,25 +25,18 @@ hashes differ, re-check that file's entries.
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
 | `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `120d4096b53cd93c15869a7de662234887a0cab5` |
-| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` |
+| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `ac65b1404ec44c1e80f7b2f187cceb6370cb2cf2` |
 | `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `480cbcb736d449a766d88891b49fdbd53dddda3e` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
 | `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
 
-The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`, which every
-"now" hash above matched.
+The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`. A "now" hash
+that differs from its scanned hash has been re-checked since, and its entries'
+line numbers are current for it.
 
 ## Beacon candidates
 
--   `datalog.go:230` — the rows are ordered by a hand-rolled loop that compares
-    each column and returns 0 after assuming the rows have equal lengths. Write
-    `slices.SortFunc(rel.Rows, slices.Compare)`: same ordering, but the call says
-    "lexicographic" instead of making the reader audit the loop. `datalog.go:210`
-    is the same shape for predicate symbols; `cmp.Or(strings.Compare(a.Symbol,
-    b.Symbol), cmp.Compare(a.Arity, b.Arity))` names the two sort keys and their
-    order.
-
--   `datalog.go:172` — `evalDatalog(..., limit int)` is the only place the fact
+-   `datalog.go:173` — `evalDatalog(..., limit int)` is the only place the fact
     budget is called a limit; `DefaultMaxFacts`, `Config.MaxFacts` and
     `Engine.maxFacts` all call it the max facts, and only Mangle's
     `engine.WithCreatedFactLimit` calls it a limit. Rename the parameter
@@ -57,28 +50,28 @@ The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`, which every
     `Validate` and `Open` both be callers of it.
 
 -   `engine.go:17` — `DefaultTimeout`'s doc says it bounds "each query and
-    Datalog evaluation", but `evalDatalog` (datalog.go:172) takes no context:
+    Datalog evaluation", but `evalDatalog` (datalog.go:173) takes no context:
     only queries are timed (engine.go:99), including the fact load
-    (datalog.go:79), and Mangle's `EvalProgram` takes no context either. Say that
+    (datalog.go:80), and Mangle's `EvalProgram` takes no context either. Say that
     it bounds each query and the Datalog fact load, or the reader goes looking
     for an evaluation deadline that does not exist.
 
--   `engine.go:134`, `datalog.go:110`, `quotient.go:99` — the same scan idiom
+-   `engine.go:134`, `datalog.go:111`, `quotient.go:99` — the same scan idiom
     (`vals`, `ptrs`, `rows.Scan(ptrs...)`) is written three times, twice into
     `[]string` and once into `[]any`. A reader comparing them has to diff the
     loops to learn that only the value type differs. Extract `scanStrings(rows,
     n)` for the two string callers and keep `scanRow` for Table, or fold both
     into one small generic.
 
--   `datalog.go:81` — the fact-loading table is an anonymous struct whose `arity`
+-   `datalog.go:82` — the fact-loading table is an anonymous struct whose `arity`
     field restates the SELECT's column count and the indices its `atom` closure
     reads, so the reader has to verify 3, 2, 3 against both. Name the type
     (`factQuery`) and size the scan by `len(rows.Columns())`, leaving the
     closure's indices as the only place the shape of a row appears.
 
--   `datalog.go:216` — `DatalogResult.EDB` and `Derived` have no doc, and
+-   `datalog.go:214` — `DatalogResult.EDB` and `Derived` have no doc, and
     `Derived` is `EstimateFactCount() - len(edb)` although the atoms of a
-    predicate the program redefines were never seeded (datalog.go:188). So the
+    predicate the program redefines were never seeded (datalog.go:189). So the
     number is neither "derived facts" nor an estimate of them, and the CLI and
     the page show it (internal/cli/format.go:69, internal/ui/datalog.html:42).
     Document both fields and the counting rule; subtracting only the seeded
@@ -91,12 +84,12 @@ The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`, which every
     `fixtureEngine(t, stmts ...string) *Engine` would leave each fixture as just
     its rows, so the one-package and cycle fixtures differ only in what matters.
 
--   `datalog.go:152`, `datalog.go:164` — the quotient names `"package"` and
+-   `datalog.go:153`, `datalog.go:165` — the quotient names `"package"` and
     `"scc"` are the programs' public vocabulary (the examples write
     `qedge("scc", ...)`), but they sit as bare literals next to `cond`, which the
     rest of the package calls `condensed`. Named constants (`packageQuotient`,
     `sccQuotient`) would show the contract without matching strings against the
-    doc comment at datalog.go:29.
+    doc comment at datalog.go:30.
 
 -   `engine.go:89`, `engine.go:98`, `quotient.go:88` — the query parameter is
     named `sql`, so inside these functions the `database/sql` package that gives
@@ -127,7 +120,7 @@ The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`, which every
     (internal/graphdb/schema.go:12) and uses it in the `rule_dep` view; the
     engine has one query, and a Go constant would be a second source of truth.
 
--   `datalog.go:260` — `datalogColumns` drops the variables whose names start
+-   `datalog.go:251` — `datalogColumns` drops the variables whose names start
     with `_`. Not raised: that is Mangle's anonymous-variable spelling, used in
     the shipped example (`target(X, "rule", _)`, internal/ui/datalog.go:44), and
     the `argN` fallback column name is what it means.

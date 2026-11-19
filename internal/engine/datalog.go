@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -208,10 +209,7 @@ func evalDatalog(program string, edb []ast.Atom, limit int) (*DatalogResult, err
 		syms = append(syms, sym)
 	}
 	slices.SortFunc(syms, func(a, b ast.PredicateSym) int {
-		if c := strings.Compare(a.Symbol, b.Symbol); c != 0 {
-			return c
-		}
-		return a.Arity - b.Arity
+		return cmp.Or(strings.Compare(a.Symbol, b.Symbol), cmp.Compare(a.Arity, b.Arity))
 	})
 	res := &DatalogResult{EDB: len(edb), Derived: store.EstimateFactCount() - len(edb)}
 	for _, sym := range syms {
@@ -227,14 +225,7 @@ func evalDatalog(program string, edb []ast.Atom, limit int) (*DatalogResult, err
 			return nil, err
 		}
 		rel.Total = len(rel.Rows)
-		slices.SortFunc(rel.Rows, func(a, b []string) int {
-			for i := range a {
-				if c := strings.Compare(a[i], b[i]); c != 0 {
-					return c
-				}
-			}
-			return 0
-		})
+		slices.SortFunc(rel.Rows, slices.Compare)
 		res.Relations = append(res.Relations, rel)
 	}
 	return res, nil
