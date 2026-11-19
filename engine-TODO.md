@@ -25,7 +25,7 @@ hashes differ, re-check that file's entries.
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
 | `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `120d4096b53cd93c15869a7de662234887a0cab5` |
-| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `ac65b1404ec44c1e80f7b2f187cceb6370cb2cf2` |
+| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `bd02316f9e7ba8c015063418601aa3856dce51c5` |
 | `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `480cbcb736d449a766d88891b49fdbd53dddda3e` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
 | `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
@@ -35,13 +35,6 @@ that differs from its scanned hash has been re-checked since, and its entries'
 line numbers are current for it.
 
 ## Beacon candidates
-
--   `datalog.go:173` — `evalDatalog(..., limit int)` is the only place the fact
-    budget is called a limit; `DefaultMaxFacts`, `Config.MaxFacts` and
-    `Engine.maxFacts` all call it the max facts, and only Mangle's
-    `engine.WithCreatedFactLimit` calls it a limit. Rename the parameter
-    `maxFacts`, so the budget can be followed from the flag to the evaluation
-    without translating.
 
 -   `engine.go:46` — `Config.Validate` applies the defaults just to check them
     and throws them away, and `Open` (engine.go:75) applies them again. A reader

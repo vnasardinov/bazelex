@@ -170,7 +170,7 @@ func (e *Engine) quotientAtoms(ctx context.Context) ([]ast.Atom, error) {
 // evalDatalog evaluates program over the given facts and returns the derived
 // relations. The facts are EDB predicates the program may use; any other
 // predicate it mentions must be declared by a rule in the program.
-func evalDatalog(program string, edb []ast.Atom, limit int) (*DatalogResult, error) {
+func evalDatalog(program string, edb []ast.Atom, maxFacts int) (*DatalogResult, error) {
 	unit, err := parse.Unit(strings.NewReader(program))
 	if err != nil {
 		return nil, err
@@ -200,7 +200,7 @@ func evalDatalog(program string, edb []ast.Atom, limit int) (*DatalogResult, err
 	if err != nil {
 		return nil, err
 	}
-	if err := engine.EvalProgram(info, store, engine.WithCreatedFactLimit(limit)); err != nil {
+	if err := engine.EvalProgram(info, store, engine.WithCreatedFactLimit(maxFacts)); err != nil {
 		return nil, err
 	}
 
