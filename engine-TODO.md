@@ -8,12 +8,13 @@ that lets a reader confirm intent without reading every line. Nothing here
 changes behavior; each entry is a rewrite candidate. Files are named relative to
 `internal/engine/`.
 
-`quotient-TODO.md` holds the earlier scan of `internal/quotient`; it also anchors
-`internal/engine/quotient.go` and `quotient_test.go`, and records no candidates
-outstanding there. This scan found nothing new in `quotient_test.go`, and the two
-entries below that cite `quotient.go` (the scan loop and the shadowing `sql`
-parameter) only showed up by reading the package as a whole, so they are new.
-Keep both files' anchors current when either lands.
+`quotient-TODO.md` holds the earlier scan of `internal/quotient` and the two
+`internal/ui/graph*` files it cites. This file owns every `internal/engine/`
+file, so the anchors and the entries below stay in one place. That scan found no
+candidates outstanding in `internal/engine/quotient.go`, and this one found none
+new in `quotient_test.go`; the two entries below that cite `quotient.go` (the
+scan loop and the shadowing `sql` parameter) only showed up by reading the
+package as a whole, so they are new.
 
 ## Revision anchors
 

@@ -6,7 +6,9 @@ Beacon candidates for the `internal/quotient` package (`Graph`,
 out what the code does. A beacon is a name, idiom or shape that lets a reader
 confirm intent without reading every line. Nothing here changes behavior; each
 entry is a rewrite candidate. Files are named relative to `internal/quotient/`
-unless a full path is given.
+unless a full path is given. `engine-TODO.md` owns `internal/engine/`; the rows
+here for the two `internal/ui/graph*` files stay because the checked entry below
+cites them.
 
 ## Revision anchors
 
@@ -20,17 +22,14 @@ hashes differ, re-check that file's entries.
 | `internal/quotient/partition.go` | `c218903cbfa3c61325e0b917ecd86c8446168e56` | `6c372301c8a25a619b681b936d3514b015a0eac5` |
 | `internal/quotient/scc.go` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` | `c41601982da9b186a83b246fcfc5d5e27d98e440` |
 | `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` | `07969c278e88d22c7984e455e61ffddb991db12a` |
-| `internal/engine/quotient.go` | `cce7015316bc53d541bbef46c9451983db149b59` | `480cbcb736d449a766d88891b49fdbd53dddda3e` |
-| `internal/engine/quotient_test.go` | `e3b175311cf0bb550b76911e2da96a6946737571` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
-| `internal/engine/datalog.go` | `f01cac896f8cd1a1a230dd36da8f13ae398da41e` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` |
 | `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `1f7655703e4a136fdecee00250189dee096af309` |
 | `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `e9788fa805af21975260fe5090fc594bf846fbb6` |
 
-`internal/engine/quotient_test.go`, `internal/engine/datalog.go` and
-`internal/ui/graph_test.go` are untouched since the scan; everything else has
+`internal/ui/graph_test.go` is untouched since the scan; everything else has
 moved as its candidates landed, but the moves were renames and same-line edits,
 so the recorded line numbers still hold. Re-check a file's entries if its hash
-has changed since this table was written.
+has changed since this table was written. `internal/engine/` is anchored in
+`engine-TODO.md`, whose scan took over those rows.
 
 ## Beacon candidates
 
