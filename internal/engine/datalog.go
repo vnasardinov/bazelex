@@ -36,6 +36,14 @@ var (
 	qmemberPred = ast.PredicateSym{Symbol: "qmember", Arity: 3} // quotient, node, member
 )
 
+// The quotient names the facts carry: the first argument of qnode, qedge and
+// qmember. A program writes them as strings, e.g. qedge("scc", From, To, N), so
+// they are the vocabulary the page documents, not an internal label.
+const (
+	packageQuotient = "package"
+	sccQuotient     = "scc"
+)
+
 // edbCache holds the graph's facts, built once from the read-only database.
 type edbCache struct {
 	mu    sync.Mutex
@@ -153,7 +161,7 @@ func (e *Engine) quotientAtoms(ctx context.Context) ([]ast.Atom, error) {
 	for _, g := range []struct {
 		name  string
 		graph *quotient.Graph
-	}{{"package", pkg}, {"scc", cond}} {
+	}{{packageQuotient, pkg}, {sccQuotient, cond}} {
 		for _, n := range g.graph.Nodes() {
 			atoms = append(atoms, ast.NewAtom(qnodePred.Symbol, ast.String(g.name), ast.String(n)))
 		}
@@ -165,7 +173,7 @@ func (e *Engine) quotientAtoms(ctx context.Context) ([]ast.Atom, error) {
 	}
 	// Packages come sorted, so the members are emitted deterministically.
 	for _, p := range pkg.Nodes() {
-		atoms = append(atoms, ast.NewAtom(qmemberPred.Symbol, ast.String("scc"), ast.String(component[p]), ast.String(p)))
+		atoms = append(atoms, ast.NewAtom(qmemberPred.Symbol, ast.String(sccQuotient), ast.String(component[p]), ast.String(p)))
 	}
 	return atoms, nil
 }
