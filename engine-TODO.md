@@ -12,9 +12,9 @@ changes behavior; each entry is a rewrite candidate. Files are named relative to
 `internal/ui/graph*` files it cites. This file owns every `internal/engine/`
 file, so the anchors and the entries below stay in one place. That scan found no
 candidates outstanding in `internal/engine/quotient.go`, and this one found none
-new in `quotient_test.go`; the two entries below that cite `quotient.go` (the
-scan loop and the shadowing `sql` parameter) only showed up by reading the
-package as a whole, so they are new.
+new in `quotient_test.go`; the entry below that cites `quotient.go` (the
+shadowing `sql` parameter) only showed up by reading the package as a whole, so
+it is new.
 
 ## Revision anchors
 
@@ -24,9 +24,9 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `120d4096b53cd93c15869a7de662234887a0cab5` |
-| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `bd02316f9e7ba8c015063418601aa3856dce51c5` |
-| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `480cbcb736d449a766d88891b49fdbd53dddda3e` |
+| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `70fa07d3c6b89951c86a614ec5ca3f66d694e215` |
+| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `c61f47971a1842db3ebaf278b14220321aa8bd46` |
+| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `4bf5e16f99b70d3e2c4ab6b892ccdaa8d63b4bd0` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
 | `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
 
@@ -43,28 +43,15 @@ line numbers are current for it.
     `Validate` and `Open` both be callers of it.
 
 -   `engine.go:17` — `DefaultTimeout`'s doc says it bounds "each query and
-    Datalog evaluation", but `evalDatalog` (datalog.go:173) takes no context:
+    Datalog evaluation", but `evalDatalog` (datalog.go:176) takes no context:
     only queries are timed (engine.go:99), including the fact load
-    (datalog.go:80), and Mangle's `EvalProgram` takes no context either. Say that
+    (datalog.go:87), and Mangle's `EvalProgram` takes no context either. Say that
     it bounds each query and the Datalog fact load, or the reader goes looking
     for an evaluation deadline that does not exist.
 
--   `engine.go:134`, `datalog.go:111`, `quotient.go:99` — the same scan idiom
-    (`vals`, `ptrs`, `rows.Scan(ptrs...)`) is written three times, twice into
-    `[]string` and once into `[]any`. A reader comparing them has to diff the
-    loops to learn that only the value type differs. Extract `scanStrings(rows,
-    n)` for the two string callers and keep `scanRow` for Table, or fold both
-    into one small generic.
-
--   `datalog.go:82` — the fact-loading table is an anonymous struct whose `arity`
-    field restates the SELECT's column count and the indices its `atom` closure
-    reads, so the reader has to verify 3, 2, 3 against both. Name the type
-    (`factQuery`) and size the scan by `len(rows.Columns())`, leaving the
-    closure's indices as the only place the shape of a row appears.
-
--   `datalog.go:214` — `DatalogResult.EDB` and `Derived` have no doc, and
+-   `datalog.go:217` — `DatalogResult.EDB` and `Derived` have no doc, and
     `Derived` is `EstimateFactCount() - len(edb)` although the atoms of a
-    predicate the program redefines were never seeded (datalog.go:189). So the
+    predicate the program redefines were never seeded (datalog.go:192). So the
     number is neither "derived facts" nor an estimate of them, and the CLI and
     the page show it (internal/cli/format.go:69, internal/ui/datalog.html:42).
     Document both fields and the counting rule; subtracting only the seeded
@@ -77,7 +64,7 @@ line numbers are current for it.
     `fixtureEngine(t, stmts ...string) *Engine` would leave each fixture as just
     its rows, so the one-package and cycle fixtures differ only in what matters.
 
--   `datalog.go:153`, `datalog.go:165` — the quotient names `"package"` and
+-   `datalog.go:156`, `datalog.go:168` — the quotient names `"package"` and
     `"scc"` are the programs' public vocabulary (the examples write
     `qedge("scc", ...)`), but they sit as bare literals next to `cond`, which the
     rest of the package calls `condensed`. Named constants (`packageQuotient`,
@@ -103,17 +90,17 @@ line numbers are current for it.
     `hasMore` is known without reading the rest. The doc comment and
     `TestQueryPage` pin the behavior.
 
--   `engine.go:154` — `RuleLabels` keeps a row only when the scan gave a
+-   `engine.go:168` — `RuleLabels` keeps a row only when the scan gave a
     `string`, although `Table` (engine.go:79) says text may also be `[]byte`.
     Not raised: the only driver is `modernc.org/sqlite` (README.md:234), which
     returns TEXT as `string`, and `TestRuleLabels` asserts the whole list.
 
--   `engine.go:148` — `kind = 'rule'` is a bare literal. Not raised: the kind
+-   `engine.go:161` — `kind = 'rule'` is a bare literal. Not raised: the kind
     vocabulary belongs to the schema, which documents it
     (internal/graphdb/schema.go:12) and uses it in the `rule_dep` view; the
     engine has one query, and a Go constant would be a second source of truth.
 
--   `datalog.go:251` — `datalogColumns` drops the variables whose names start
+-   `datalog.go:254` — `datalogColumns` drops the variables whose names start
     with `_`. Not raised: that is Mangle's anonymous-variable spelling, used in
     the shipped example (`target(X, "rule", _)`, internal/ui/datalog.go:44), and
     the `argN` fallback column name is what it means.

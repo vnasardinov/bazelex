@@ -69,6 +69,13 @@ func (e *Engine) Datalog(ctx context.Context, program string) (*DatalogResult, e
 	return evalDatalog(program, edb, e.maxFacts)
 }
 
+// factQuery is one SELECT over the database and the atom it builds from each
+// row.
+type factQuery struct {
+	sql  string
+	atom func([]string) ast.Atom
+}
+
 // datalogFacts returns the graph as Datalog facts, reading them from the
 // database on first use only: the database is read-only, so they never change.
 func (e *Engine) datalogFacts(ctx context.Context) ([]ast.Atom, error) {
@@ -79,22 +86,18 @@ func (e *Engine) datalogFacts(ctx context.Context) ([]ast.Atom, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
-	queries := []struct {
-		sql   string
-		arity int
-		atom  func([]string) ast.Atom
-	}{
-		{`SELECT label, kind, package FROM target`, 3,
+	queries := []factQuery{
+		{`SELECT label, kind, package FROM target`,
 			func(v []string) ast.Atom {
 				return ast.NewAtom(targetPred.Symbol, ast.String(v[0]), ast.String(v[1]), ast.String(v[2]))
 			}},
 		{`SELECT f.label, t.label FROM rule_dep d
-		 JOIN target f ON f.id = d.from_id JOIN target t ON t.id = d.to_id`, 2,
+		 JOIN target f ON f.id = d.from_id JOIN target t ON t.id = d.to_id`,
 			func(v []string) ast.Atom {
 				return ast.NewAtom(depPred.Symbol, ast.String(v[0]), ast.String(v[1]))
 			}},
 		{`SELECT f.label, t.label, e.attr FROM edge e
-		 JOIN target f ON f.id = e.from_id JOIN target t ON t.id = e.to_id`, 3,
+		 JOIN target f ON f.id = e.from_id JOIN target t ON t.id = e.to_id`,
 			func(v []string) ast.Atom {
 				return ast.NewAtom(edgePred.Symbol, ast.String(v[0]), ast.String(v[1]), ast.String(v[2]))
 			}},
@@ -107,13 +110,13 @@ func (e *Engine) datalogFacts(ctx context.Context) ([]ast.Atom, error) {
 				return err
 			}
 			defer rows.Close()
+			cols, err := rows.Columns()
+			if err != nil {
+				return err
+			}
 			for rows.Next() {
-				vals := make([]string, q.arity)
-				ptrs := make([]any, q.arity)
-				for i := range vals {
-					ptrs[i] = &vals[i]
-				}
-				if err := rows.Scan(ptrs...); err != nil {
+				vals, err := scanStrings(rows, len(cols))
+				if err != nil {
 					return err
 				}
 				atoms = append(atoms, q.atom(vals))

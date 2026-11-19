@@ -96,12 +96,8 @@ func eachRow(ctx context.Context, db *sql.DB, sql string, f func([]string)) erro
 		return err
 	}
 	for rows.Next() {
-		vals := make([]string, len(cols))
-		ptrs := make([]any, len(cols))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
+		vals, err := scanStrings(rows, len(cols))
+		if err != nil {
 			return err
 		}
 		f(vals)

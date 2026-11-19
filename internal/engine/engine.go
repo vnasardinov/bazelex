@@ -142,6 +142,20 @@ func scanRow(rows *sql.Rows, n int) ([]any, error) {
 	return vals, nil
 }
 
+// scanStrings is scanRow into strings: the callers that read only names, labels
+// and counts, so that scanRow's destination type is the only difference.
+func scanStrings(rows *sql.Rows, n int) ([]string, error) {
+	vals := make([]string, n)
+	ptrs := make([]any, n)
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := rows.Scan(ptrs...); err != nil {
+		return nil, err
+	}
+	return vals, nil
+}
+
 // RuleLabels returns at most max rule labels in label order. It powers input
 // autocompletion in the web UI.
 func (e *Engine) RuleLabels(ctx context.Context, max int) ([]string, error) {
