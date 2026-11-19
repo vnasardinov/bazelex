@@ -25,7 +25,7 @@ hashes differ, re-check that file's entries.
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
 | `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `70fa07d3c6b89951c86a614ec5ca3f66d694e215` |
-| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `a7e7d87c2e058a3070b4dcdce1b60018f0cf2d55` |
+| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `7c8575a290d5f8b64fcbdabcb614cce841bbf260` |
 | `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `4bf5e16f99b70d3e2c4ab6b892ccdaa8d63b4bd0` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
 | `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
@@ -43,20 +43,11 @@ line numbers are current for it.
     `Validate` and `Open` both be callers of it.
 
 -   `engine.go:17` — `DefaultTimeout`'s doc says it bounds "each query and
-    Datalog evaluation", but `evalDatalog` (datalog.go:184) takes no context:
+    Datalog evaluation", but `evalDatalog` (datalog.go:192) takes no context:
     only queries are timed (engine.go:99), including the fact load
-    (datalog.go:95), and Mangle's `EvalProgram` takes no context either. Say that
+    (datalog.go:103), and Mangle's `EvalProgram` takes no context either. Say that
     it bounds each query and the Datalog fact load, or the reader goes looking
     for an evaluation deadline that does not exist.
-
--   `datalog.go:225` — `DatalogResult.EDB` and `Derived` have no doc, and
-    `Derived` is `EstimateFactCount() - len(edb)` although the atoms of a
-    predicate the program redefines were never seeded (datalog.go:200). So the
-    number is neither "derived facts" nor an estimate of them, and the CLI and
-    the page show it (internal/cli/format.go:69, internal/ui/datalog.html:42).
-    Document both fields and the counting rule; subtracting only the seeded
-    atoms would be the matching fix, but it changes the number for a program
-    that redefines a loaded predicate.
 
 -   `engine_test.go:18`, `quotient_test.go:20` — the two fixtures repeat the same
     open-create-schema-insert-close-reopen-read-only-`Open` dance, and `testDB`
@@ -93,7 +84,18 @@ line numbers are current for it.
     (internal/graphdb/schema.go:12) and uses it in the `rule_dep` view; the
     engine has one query, and a Go constant would be a second source of truth.
 
--   `datalog.go:262` — `datalogColumns` drops the variables whose names start
+-   `datalog.go:270` — `datalogColumns` drops the variables whose names start
     with `_`. Not raised: that is Mangle's anonymous-variable spelling, used in
     the shipped example (`target(X, "rule", _)`, internal/ui/datalog.go:44), and
     the `argN` fallback column name is what it means.
+
+## Deferred
+
+-   `datalog.go:233` — `Derived` is the store's fact count minus every loaded
+    fact, including the atoms of a predicate the program redefines, which are
+    never seeded (datalog.go:208). So it undercounts for such a program, and the
+    CLI and the page show the number (internal/cli/format.go:69,
+    internal/ui/datalog.html:42). `DatalogResult` now documents the rule;
+    counting only the seeded atoms would fix it, but that changes a displayed
+    number, so it is a behavior change and gets its own commit, not a beacon
+    rewrite.

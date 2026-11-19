@@ -60,8 +60,16 @@ type Relation struct {
 
 // DatalogResult is the outcome of evaluating one program.
 type DatalogResult struct {
-	EDB, Derived int
-	Relations    []Relation
+	// EDB is the number of facts loaded from the database, including those of
+	// a predicate the program redefines.
+	EDB int
+	// Derived is the store's fact count minus EDB. A predicate the program
+	// defines is not loaded (evalDatalog filters its facts out), so for a
+	// program that redefines a loaded predicate this undercounts what the
+	// program derives by that predicate's loaded facts.
+	Derived int
+	// Relations holds the derived predicates, in symbol order.
+	Relations []Relation
 }
 
 // Datalog evaluates program over the graph's facts and returns the relations it
