@@ -220,7 +220,7 @@ func (s *server) view(ctx context.Context, q Query, params url.Values) queryView
 		if err != nil {
 			v.Err = err.Error()
 		}
-		v.addRowLinks(params)
+		v.addLinks(params)
 		v.markNumericColumns()
 		v.paginate(params, hasNext)
 	}
@@ -244,23 +244,42 @@ func (v *queryView) paginate(params url.Values, hasNext bool) {
 func (v *queryView) markNumericColumns() {
 	v.NumCols = make([]bool, len(v.Columns))
 	for i := range v.NumCols {
-		v.NumCols[i] = len(v.Rows) > 0
-		for _, row := range v.Rows {
-			v.NumCols[i] = v.NumCols[i] && row[i].Num
-		}
+		v.NumCols[i] = v.columnIsNumeric(i)
 	}
 }
 
-// addRowLinks turns the values of v's RowLink column into links.
-func (v *queryView) addRowLinks(params url.Values) {
-	if v.GraphColumn != "" {
-		if col := slices.Index(v.Columns, v.GraphColumn); col >= 0 {
-			for _, row := range v.Rows {
-				row[col].URL = graphURL(row[col].Text, defaultDepth, true)
-				row[col].NewTab = true
-			}
-		}
+// columnIsNumeric reports whether column i holds a number in every row. A
+// column with no rows is not numeric.
+func (v *queryView) columnIsNumeric(i int) bool {
+	return len(v.Rows) > 0 && !slices.ContainsFunc(v.Rows, func(row []cell) bool { return !row[i].Num })
+}
+
+// addLinks turns the values of v's link columns into links: the package graph
+// links of GraphColumn and the query links of RowLink.
+func (v *queryView) addLinks(params url.Values) {
+	v.addGraphLinks()
+	v.addQueryLinks(params)
+}
+
+// addGraphLinks turns the values of v's GraphColumn into links to the package
+// graph page, centered on the package's dependency cycle.
+func (v *queryView) addGraphLinks() {
+	if v.GraphColumn == "" {
+		return
 	}
+	col := slices.Index(v.Columns, v.GraphColumn)
+	if col < 0 {
+		return
+	}
+	for _, row := range v.Rows {
+		row[col].URL = graphURL(row[col].Text, defaultDepth, true)
+		row[col].NewTab = true
+	}
+}
+
+// addQueryLinks turns the values of v's RowLink column into links that open
+// RowLink.ToQuery.
+func (v *queryView) addQueryLinks(params url.Values) {
 	if v.RowLink == nil {
 		return
 	}

@@ -173,7 +173,7 @@ func TestCycleQueryLinksToGraph(t *testing.T) {
 	v.GraphColumn = "comp"
 	v.Columns = []string{"comp", "packages"}
 	v.Rows = [][]cell{{{Text: "a/b"}, {Text: "2"}}}
-	v.addRowLinks(nil)
+	v.addLinks(nil)
 	if got := v.Rows[0][0].URL; got != "graph?cycle=1&depth=1&pkg=a%2Fb" || !v.Rows[0][0].NewTab {
 		t.Errorf("link = %q", got)
 	}

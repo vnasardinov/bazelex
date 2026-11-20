@@ -21,7 +21,7 @@ differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/ui/server.go` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` |
+| `internal/ui/server.go` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` | `1c939ce04050ad366509521850c56b1c8eb26eb8` |
 | `internal/ui/queries.go` | `c6e692ba9d2563849a647537baad64d23546010d` | `c6e692ba9d2563849a647537baad64d23546010d` |
 | `internal/ui/graph.go` | `1f7655703e4a136fdecee00250189dee096af309` | `f785bc839e12c9a59771b1a794ef8079c075b01d` |
 | `internal/ui/datalog.go` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` |
@@ -29,21 +29,13 @@ differ, re-check that file's entries.
 | `internal/ui/graph.html` | `46be89c263cc726cd60fe9a8ff8074f268969758` | `46be89c263cc726cd60fe9a8ff8074f268969758` |
 | `internal/ui/datalog.html` | `bc84c4dc71de8529d56a423a133286b71a7a891d` | `bc84c4dc71de8529d56a423a133286b71a7a891d` |
 | `internal/ui/server_test.go` | `d16a4c05e7cbd2365eef75a1bfacb7a1a550b51e` | `d16a4c05e7cbd2365eef75a1bfacb7a1a550b51e` |
-| `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `e9788fa805af21975260fe5090fc594bf846fbb6` |
+| `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `6003643428d98ce89eac11ce7325b0850d7ebf54` |
 | `internal/ui/datalog_test.go` | `aef9cb5245f6da956f1221fd9505c18ecefc40d6` | `aef9cb5245f6da956f1221fd9505c18ecefc40d6` |
 
 The scan ran at commit `d51a00cfcc38d02a5dbe7eec53f0ba5775166190`, and the
 working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Beacon candidates
-
--   `server.go:244-251` (`markNumericColumns`) — the reader has to assemble "a
-    column is numeric when there is a row and no row's cell is non-numeric" from
-    the seed `NumCols[i] = len(v.Rows) > 0` and the `&&` accumulation in the loop.
-    Extract a named predicate, e.g. `columnIsNumeric(i) bool { return
-    len(v.Rows) > 0 && !slices.ContainsFunc(v.Rows, func(row []cell) bool {
-    return !row[i].Num }) }`. The rule then has a name instead of an accumulating
-    boolean.
 
 -   `queries.go:177,190,206-208,231` — `Param` literals are unkeyed
     (`{"target", "Target", "//foo:bar"}`), so the reader must work out which
@@ -53,18 +45,11 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     three roles then read at the declaration, matching the pattern the file
     already uses.
 
--   `server.go:254-279` (`addRowLinks`) — the name says row links, but the body
-    also turns the `GraphColumn` cells into package-graph links
-    (server.go:256-263), a different kind of link to a different page. Extract
-    that block as `addGraphLinks()` (or rename the method to cover both). The
-    method name then matches what it does, and the two link kinds stop looking
-    like one.
-
 -   `server.go:26` (`maxLabels = 20000`) — the cap on the autocompletion `datalist`
     is the one limit in the package that states no reasoning, where
     `maxGraphNodes` (graph.go:30-33), `maxCachedDrawings` (graph.go:165-167) and
     `maxDatalogRows` (datalog.go:12-14) each explain themselves. Add a one-line
-    comment naming what it bounds (one `<option>` per label, server.go:335) and
+    comment naming what it bounds (one `<option>` per label, server.go:354) and
     roughly the size it is chosen for.
 
 ## Checked, not a candidate
