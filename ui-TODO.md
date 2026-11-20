@@ -23,7 +23,7 @@ differ, re-check that file's entries.
 | --- | --- | --- |
 | `internal/ui/server.go` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` |
 | `internal/ui/queries.go` | `c6e692ba9d2563849a647537baad64d23546010d` | `c6e692ba9d2563849a647537baad64d23546010d` |
-| `internal/ui/graph.go` | `1f7655703e4a136fdecee00250189dee096af309` | `1f7655703e4a136fdecee00250189dee096af309` |
+| `internal/ui/graph.go` | `1f7655703e4a136fdecee00250189dee096af309` | `f785bc839e12c9a59771b1a794ef8079c075b01d` |
 | `internal/ui/datalog.go` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` |
 | `internal/ui/index.html` | `ca4427e7571d0dc1a745c74706f5f64a86a5c1ad` | `ca4427e7571d0dc1a745c74706f5f64a86a5c1ad` |
 | `internal/ui/graph.html` | `46be89c263cc726cd60fe9a8ff8074f268969758` | `46be89c263cc726cd60fe9a8ff8074f268969758` |
@@ -36,13 +36,6 @@ The scan ran at commit `d51a00cfcc38d02a5dbe7eec53f0ba5775166190`, and the
 working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Beacon candidates
-
--   `graph.go:97` (`renderSVG(ctx, dot string)`) — the parameter `dot` shadows the
-    package-level `dot` builder (graph.go:43), so inside the function the
-    identifier means the source string while a reader coming from `draw`'s call
-    `dot(g, nodes, ...)` (graph.go:236) expects the function. Rename the parameter
-    to `src` (or `dotSrc`). The DOT builder then keeps its name everywhere, and
-    the parameter reads as the input it is.
 
 -   `server.go:244-251` (`markNumericColumns`) — the reader has to assemble "a
     column is numeric when there is a row and no row's cell is non-numeric" from
@@ -66,12 +59,6 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     that block as `addGraphLinks()` (or rename the method to cover both). The
     method name then matches what it does, and the two link kinds stop looking
     like one.
-
--   `graph.go:134` (`graphKey.query()`) — `query` reads like a SQL query, which is
-    what the package's `Query` type and `queries` list are, but it returns URL
-    query parameters. Rename to `params()` (or `urlValues()`), matching the
-    `params url.Values` name used throughout `server.go` (server.go:156,199). The
-    value's kind then shows at the call sites (graph.go:144,271).
 
 -   `server.go:26` (`maxLabels = 20000`) — the cap on the autocompletion `datalist`
     is the one limit in the package that states no reasoning, where

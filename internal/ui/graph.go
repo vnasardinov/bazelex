@@ -94,7 +94,7 @@ func dotQuote(s string) string {
 // Creating a Graphviz instance compiles the WASM module, which is slow and
 // memory-hungry, so the server creates one on first use and keeps it. An
 // instance is not safe for concurrent use, so renders take turns.
-func (s *server) renderSVG(ctx context.Context, dot string) (string, error) {
+func (s *server) renderSVG(ctx context.Context, src string) (string, error) {
 	s.gvMu.Lock()
 	defer s.gvMu.Unlock()
 	if s.gv == nil {
@@ -106,7 +106,7 @@ func (s *server) renderSVG(ctx context.Context, dot string) (string, error) {
 		s.gv = g
 	}
 	g := s.gv
-	gr, err := graphviz.ParseBytes([]byte(dot))
+	gr, err := graphviz.ParseBytes([]byte(src))
 	if err != nil {
 		return "", err
 	}
@@ -130,8 +130,8 @@ type graphKey struct {
 	cycle bool // draw the whole dependency cycle of pkg as the center
 }
 
-// query returns the key as URL query parameters.
-func (k graphKey) query() string {
+// params returns the key as URL query parameters.
+func (k graphKey) params() string {
 	p := url.Values{"pkg": {k.pkg}, "depth": {strconv.Itoa(k.depth)}}
 	if k.cycle {
 		p.Set("cycle", "1")
@@ -141,7 +141,7 @@ func (k graphKey) query() string {
 
 // graphURL returns the link to the graph page centered on pkg.
 func graphURL(pkg string, depth int, cycle bool) string {
-	return "graph?" + graphKey{pkg, depth, cycle}.query()
+	return "graph?" + graphKey{pkg, depth, cycle}.params()
 }
 
 // parseGraphKey reads the graph parameters of r. ok is false if there is no pkg.
@@ -268,7 +268,7 @@ func (s *server) graph(w http.ResponseWriter, r *http.Request) {
 			v.Notice, v.Nodes, v.CycleSize = d.notice, d.nodes, d.cycleSize
 			// The SVG is Graphviz's own output, and every string it embeds is escaped.
 			v.SVG = template.HTML(d.svg)
-			v.DotURL, v.SVGURL = "graph.dot?"+k.query(), "graph.svg?"+k.query()
+			v.DotURL, v.SVGURL = "graph.dot?"+k.params(), "graph.svg?"+k.params()
 		}
 	}
 	if err := graphTmpl.Execute(w, v); err != nil {
