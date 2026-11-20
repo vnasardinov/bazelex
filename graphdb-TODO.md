@@ -21,24 +21,12 @@ hashes differ, re-check that file's entries.
 | --- | --- | --- |
 | `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `98f19fa6693f5103e0c792ca36dee39379140141` |
 | `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
-| `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` |
+| `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `41d1646c1c794c705e3f671780e63a4aae4d1464` |
 
 The scan ran at commit `c1e35948f23dc7d37ad7e2988656fc4e1141b13f`, and the
 working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Beacon candidates
-
--   `load_test.go:16` — `labelAttr` builds every test attribute, not only label
-    ones: it is called for `name` (STRING), `tags` (STRING_LIST) and `size`
-    (STRING) as well as `deps`/`srcs`/`visibility` (LABEL_LIST). Rename it
-    `newAttr` (the package's `attr` type rules out `attr`): the call sites then
-    name the type they pass instead of promising a label.
-
--   `load_test.go:138`, `load_test.go:178` — `reflect.DeepEqual` where the
-    engine and quotient tests use `slices.Equal`; `[]row` and `[][3]string` are
-    comparable, so `slices.Equal(got, want)` is the repo's idiom and drops the
-    `reflect` import. A reader who knows the pattern confirms the comparison
-    without checking that the element type is comparable.
 
 -   `load_test.go:86`, `load_test.go:143` — both tests repeat the open
     `:memory:`, `SetMaxOpenConns(1)`, `Exec(Schema)` preamble. A

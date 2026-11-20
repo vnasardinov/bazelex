@@ -3,7 +3,7 @@ package graphdb
 import (
 	"bytes"
 	"database/sql"
-	"reflect"
+	"slices"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -13,7 +13,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func labelAttr(name string, typ bpb.Attribute_Discriminator, s string, list ...string) *bpb.Attribute {
+func newAttr(name string, typ bpb.Attribute_Discriminator, s string, list ...string) *bpb.Attribute {
 	return &bpb.Attribute{
 		Name:            proto.String(name),
 		Type:            typ.Enum(),
@@ -56,13 +56,13 @@ func testStream(t *testing.T) *bytes.Buffer {
 	}
 	targets := []*bpb.Target{
 		rule("//a:lib", "go_library", []string{"//a:dep", "//a:hdr.go", "//tools:implicit"},
-			labelAttr("deps", bpb.Attribute_LABEL_LIST, "", "//a:dep", "//a:dep"),
-			labelAttr("srcs", bpb.Attribute_LABEL_LIST, "", "//a:hdr.go"),
-			labelAttr("name", bpb.Attribute_STRING, "lib"),
-			explicit(labelAttr("tags", bpb.Attribute_STRING_LIST, "", "manual", "no-sandbox")),
+			newAttr("deps", bpb.Attribute_LABEL_LIST, "", "//a:dep", "//a:dep"),
+			newAttr("srcs", bpb.Attribute_LABEL_LIST, "", "//a:hdr.go"),
+			newAttr("name", bpb.Attribute_STRING, "lib"),
+			explicit(newAttr("tags", bpb.Attribute_STRING_LIST, "", "manual", "no-sandbox")),
 			explicit(&bpb.Attribute{Name: proto.String("testonly"), Type: bpb.Attribute_BOOLEAN.Enum(), BooleanValue: proto.Bool(true)}),
-			labelAttr("size", bpb.Attribute_STRING, "small"), // default, not explicit
-			labelAttr("visibility", bpb.Attribute_LABEL_LIST, "", "//visibility:public"),
+			newAttr("size", bpb.Attribute_STRING, "small"), // default, not explicit
+			newAttr("visibility", bpb.Attribute_LABEL_LIST, "", "//visibility:public"),
 		),
 		rule("//a:dep", "go_library", nil, selectAttr),
 		{
@@ -135,7 +135,7 @@ func TestLoad(t *testing.T) {
 		{"//a:lib", "//a:hdr.go", true, "srcs", 0},
 		{"//a:lib", "//visibility:public", false, "visibility", 0},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("edges mismatch\n got: %v\nwant: %v", got, want)
 	}
 }
@@ -175,7 +175,7 @@ func TestLoadAttributes(t *testing.T) {
 		{"//a:lib", "testonly", "true"},
 		{"//a:lib", "visibility", "//visibility:public"},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("attributes mismatch\n got: %v\nwant: %v", got, want)
 	}
 }
