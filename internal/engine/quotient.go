@@ -83,10 +83,10 @@ GROUP BY f.package, t.package`, func(v []string) {
 	return g, nil
 }
 
-// eachRow runs sql and calls f with each row, whose values are scanned as
-// strings: the callers here read names and small counts, never a blob.
-func eachRow(ctx context.Context, db *sql.DB, sql string, f func([]string)) error {
-	rows, err := db.QueryContext(ctx, sql)
+// eachRow runs the statement and calls f with each row, whose values are
+// scanned as strings: the callers read names and small counts, never a blob.
+func eachRow(ctx context.Context, db *sql.DB, query string, f func([]string)) error {
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}

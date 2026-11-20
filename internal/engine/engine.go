@@ -84,22 +84,22 @@ type Table struct {
 	Rows    [][]any
 }
 
-// Query runs sql and returns all of its rows. args are bound to the statement's
-// parameters.
-func (e *Engine) Query(ctx context.Context, sql string, args ...any) (*Table, error) {
-	t, _, err := e.QueryPage(ctx, 0, 0, sql, args...)
+// Query runs the statement and returns all of its rows. args are bound to the
+// statement's parameters.
+func (e *Engine) Query(ctx context.Context, query string, args ...any) (*Table, error) {
+	t, _, err := e.QueryPage(ctx, 0, 0, query, args...)
 	return t, err
 }
 
-// QueryPage runs sql, skips offset rows and returns at most limit of them (0 for
-// all), reporting whether any rows follow the ones returned. Front-ends use it
-// to paginate or to cap large results without reading a whole result set into
-// memory first.
-func (e *Engine) QueryPage(ctx context.Context, offset, limit int, sql string, args ...any) (*Table, bool, error) {
+// QueryPage runs the statement, skips offset rows and returns at most limit of
+// them (0 for all), reporting whether any rows follow the ones returned.
+// Front-ends use it to paginate or to cap large results without reading a whole
+// result set into memory first.
+func (e *Engine) QueryPage(ctx context.Context, offset, limit int, query string, args ...any) (*Table, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
-	rows, err := e.db.QueryContext(ctx, sql, args...)
+	rows, err := e.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, false, err
 	}

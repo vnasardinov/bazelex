@@ -24,9 +24,9 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `4dcde5db438ac1745fead18f57734433849e5f0b` |
+| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `43a8f3471571bc1ccc85839cdff53c44ddaa2d2f` |
 | `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `7c8575a290d5f8b64fcbdabcb614cce841bbf260` |
-| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `4bf5e16f99b70d3e2c4ab6b892ccdaa8d63b4bd0` |
+| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `3911ad627e87896f5e56ab0a163e65c593e3a52a` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
 | `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
 
@@ -42,12 +42,6 @@ line numbers are current for it.
     `fixtureEngine(t, stmts ...string) *Engine` would leave each fixture as just
     its rows, so the one-package and cycle fixtures differ only in what matters.
 
--   `engine.go:89`, `engine.go:98`, `quotient.go:88` — the query parameter is
-    named `sql`, so inside these functions the `database/sql` package that gives
-    the file `*sql.DB` and `*sql.Rows` is shadowed. Rename it `query`: the
-    signature then reads like the SQL it is, and a reader can reach for `sql.`
-    inside the function without a type error.
-
 -   `engine_test.go:140` — `TestFormat` ends by asserting `IsNumber`
     (engine_test.go:155), so a reader looking for IsNumber's coverage by test
     name finds none. Split `TestIsNumber` out, or name the test after both.
@@ -55,7 +49,7 @@ line numbers are current for it.
 ## Checked, not a candidate
 
 -   `engine.go:112` — `QueryPage` skips `offset` rows in Go instead of adding
-    `LIMIT`/`OFFSET` to the SQL. That is deliberate: `sql` is the caller's
+    `LIMIT`/`OFFSET` to the SQL. That is deliberate: `query` is the caller's
     arbitrary statement, which may carry its own `LIMIT`, so rewriting it would
     change the caller's query, and the probe row (engine.go:118) is how
     `hasMore` is known without reading the rest. The doc comment and
