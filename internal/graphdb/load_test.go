@@ -131,6 +131,9 @@ func TestLoad(t *testing.T) {
 		}
 		got = append(got, r)
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	want := []row{
 		{"//a:dep", "//conditions:linux", false, "<select_condition>", 1},
 		{"//a:dep", "//a:linux_only", false, "deps", 1},
@@ -167,6 +170,9 @@ func TestLoadAttributes(t *testing.T) {
 			t.Fatal(err)
 		}
 		got = append(got, r)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
 	}
 	want := [][3]string{
 		{"//a:lib", "tags", "manual"},
