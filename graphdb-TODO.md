@@ -19,7 +19,7 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` |
+| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `4797d8e78ea19dd778de49c069e78cb33b76d441` |
 | `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
 | `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` |
 
@@ -45,11 +45,6 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     `reflect` import. A reader who knows the pattern confirms the comparison
     without checking that the element type is comparable.
 
--   `load.go:328` — `nullable` is an adjective, so `nullable(tg.ruleClass)`
-    reads like an action on the class. Rename it `nullIfEmpty`: the call then
-    states the rule (nil for the empty string) instead of making the reader
-    open the helper.
-
 -   `load.go:73` — `bufio.NewReaderSize(r, 1<<20)` is the package's only magic
     number. Give it a name, e.g. `readBufferSize = 1 << 20` with a word on why
     that size, so the reader does not have to decode the shift to learn that
@@ -65,11 +60,6 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     `testDB(t) *sql.DB` helper would leave each test as its `Load` call and its
     query, and hold the "each in-memory connection is its own database" note
     once.
-
--   `load.go:335` — `b2i` abbreviates bool-to-int for the two `IN` columns;
-    `boolToInt(e.inSelect)` says what the call site stores without the reader
-    decoding the name. The helper is small, but it is the only unexplained name
-    on the insert line.
 
 ## Checked, not a candidate
 

@@ -124,7 +124,7 @@ func (w *writer) close() {
 // tg is a rule.
 func (w *writer) write(tg target, rule *bpb.Rule) error {
 	pkg, name := splitLabel(tg.label)
-	res, err := w.target.Exec(tg.label, tg.kind, pkg, name, nullable(tg.ruleClass), nullable(tg.location))
+	res, err := w.target.Exec(tg.label, tg.kind, pkg, name, nullIfEmpty(tg.ruleClass), nullIfEmpty(tg.location))
 	if err != nil {
 		return fmt.Errorf("inserting %s: %w", tg.label, err)
 	}
@@ -133,7 +133,7 @@ func (w *writer) write(tg target, rule *bpb.Rule) error {
 		return err
 	}
 	for _, e := range tg.edges {
-		if _, err := w.edge.Exec(id, e.to, e.attr, b2i(e.inSelect), b2i(e.nodep)); err != nil {
+		if _, err := w.edge.Exec(id, e.to, e.attr, boolToInt(e.inSelect), boolToInt(e.nodep)); err != nil {
 			return fmt.Errorf("inserting edge %s -> %s: %w", tg.label, e.to, err)
 		}
 	}
@@ -325,14 +325,14 @@ func splitLabel(label string) (pkg, name string) {
 	return label, label[strings.LastIndex(label, "/")+1:]
 }
 
-func nullable(s string) any {
+func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
 	}
 	return s
 }
 
-func b2i(b bool) int {
+func boolToInt(b bool) int {
 	if b {
 		return 1
 	}
