@@ -151,7 +151,20 @@ func TestFormat(t *testing.T) {
 			t.Errorf("Format(%#v) = %q, want %q", c.in, got, c.want)
 		}
 	}
-	if !IsNumber(int64(1)) || !IsNumber(float64(1)) || IsNumber("1") || IsNumber(nil) {
-		t.Error("IsNumber misclassified a value")
+}
+
+func TestIsNumber(t *testing.T) {
+	for _, c := range []struct {
+		in   any
+		want bool
+	}{
+		{int64(1), true},
+		{float64(1), true},
+		{"1", false},
+		{nil, false},
+	} {
+		if got := IsNumber(c.in); got != c.want {
+			t.Errorf("IsNumber(%#v) = %v, want %v", c.in, got, c.want)
+		}
 	}
 }
