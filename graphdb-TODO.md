@@ -19,7 +19,7 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `d0e3f17c3c0a73a70089087bf3bb79918edd1b71` |
+| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `98f19fa6693f5103e0c792ca36dee39379140141` |
 | `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
 | `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` |
 
@@ -40,11 +40,6 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     `reflect` import. A reader who knows the pattern confirms the comparison
     without checking that the element type is comparable.
 
--   `load.go:73` — `bufio.NewReaderSize(r, 1<<20)` is the package's only magic
-    number. Give it a name, e.g. `readBufferSize = 1 << 20` with a word on why
-    that size, so the reader does not have to decode the shift to learn that
-    this is the stream buffer.
-
 -   `load_test.go:86`, `load_test.go:143` — both tests repeat the open
     `:memory:`, `SetMaxOpenConns(1)`, `Exec(Schema)` preamble. A
     `testDB(t) *sql.DB` helper would leave each test as its `Load` call and its
@@ -58,19 +53,19 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     if the attribute does not create a build dependency". The field mirrors the
     storage, so the name is the beacon.
 
--   `load.go:152-166` — the `kind` literals ("rule", "source_file", ...) are the
+-   `load.go:154-168` — the `kind` literals ("rule", "source_file", ...) are the
     schema's vocabulary, documented at schema.go:12 and README.md:243, and each
     one is the case for its proto type (`bpb.Target_RULE` -> "rule"), so the
     mapping is already visible. A Go constant would be a second source of
     truth; the engine scan reached the same conclusion for its `kind = 'rule'`
     query (engine-TODO.md).
 
--   `load.go:230`, `load.go:269` — the `"visibility"` literals are the
+-   `load.go:232`, `load.go:271` — the `"visibility"` literals are the
     documented exception to "only explicitly set attributes are stored"
     (schema.go:35-36, README.md:256), and both sit in the same function a few
     lines apart, so the repetition marks the exception.
 
--   `load.go:317` — `splitLabel`'s comment shows only the `//pkg:name` form, but
+-   `load.go:319` — `splitLabel`'s comment shows only the `//pkg:name` form, but
     `TestSplitLabel` (load_test.go:183) asserts the no-colon form (`//a/b` ->
     `a/b`, `b`) and `//:root`, so the behavior is pinned by a test and the
     example is illustrative rather than the whole contract.

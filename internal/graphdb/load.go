@@ -70,7 +70,9 @@ func insertTargets(tx *sql.Tx, r io.Reader) (int, error) {
 	defer w.close()
 
 	n := 0
-	br := bufio.NewReaderSize(r, 1<<20)
+	// A streamed Target message can exceed bufio's 4 KiB default.
+	const readBufferSize = 1 << 20
+	br := bufio.NewReaderSize(r, readBufferSize)
 	for {
 		t := &bpb.Target{}
 		if err := protodelim.UnmarshalFrom(br, t); err != nil {
