@@ -120,7 +120,7 @@ func (e *Engine) QueryPage(ctx context.Context, offset, limit int, query string,
 		if limit > 0 && len(t.Rows) == limit {
 			return t, true, nil
 		}
-		row, err := scanRow(rows, len(t.Columns))
+		row, err := scanInto[any](rows, len(t.Columns))
 		if err != nil {
 			return nil, false, err
 		}
@@ -129,23 +129,13 @@ func (e *Engine) QueryPage(ctx context.Context, offset, limit int, query string,
 	return t, false, rows.Err()
 }
 
-// scanRow reads the current row of rows, which has n columns.
-func scanRow(rows *sql.Rows, n int) ([]any, error) {
-	vals := make([]any, n)
-	ptrs := make([]any, n)
-	for i := range vals {
-		ptrs[i] = &vals[i]
-	}
-	if err := rows.Scan(ptrs...); err != nil {
-		return nil, err
-	}
-	return vals, nil
-}
-
-// scanStrings is scanRow into strings: the callers that read only names, labels
-// and counts, so that scanRow's destination type is the only difference.
-func scanStrings(rows *sql.Rows, n int) ([]string, error) {
-	vals := make([]string, n)
+// scanInto reads the current row of rows, which has n columns, into a slice of n
+// values of type T. One body serves every destination type, which is why T is
+// here. T buys clarity, not safety: rows.Scan takes its destinations as ...any,
+// so it cannot check T against the column types at compile time, and a T it
+// cannot write (a struct with no Scanner, say) fails at run time, not here.
+func scanInto[T any](rows *sql.Rows, n int) ([]T, error) {
+	vals := make([]T, n)
 	ptrs := make([]any, n)
 	for i := range vals {
 		ptrs[i] = &vals[i]

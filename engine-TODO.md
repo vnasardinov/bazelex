@@ -23,15 +23,17 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `43a8f3471571bc1ccc85839cdff53c44ddaa2d2f` |
-| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `7c8575a290d5f8b64fcbdabcb614cce841bbf260` |
-| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `3911ad627e87896f5e56ab0a163e65c593e3a52a` |
+| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `89b169d7172c7c6cf565d5c2ae646d9f50db4922` |
+| `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `b2303952e64e5fa177640db357b0c2e355543436` |
+| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `f3a6d4631fd948fffa6bca3181a31c3f77ebcb8d` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `7b0cbcb7208d375d64d7bd2423f2df7415166d26` |
 | `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `500df3a8035cf9afe30bffdf8a5cbbada5d42507` |
 
 The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`. A "now" hash
 that differs from its scanned hash has been re-checked since, and its entries'
-line numbers are current for it.
+line numbers are current for it. The `now` column was last refreshed after
+`scanInto` replaced the duplicate `scanRow` and `scanStrings`, which shortened
+`engine.go` by ten lines; the entries below are current for that revision.
 
 ## Beacon candidates
 
@@ -46,15 +48,20 @@ None outstanding.
     `hasMore` is known without reading the rest. The doc comment and
     `TestQueryPage` pin the behavior.
 
--   `engine.go:168` — `RuleLabels` keeps a row only when the scan gave a
+-   `engine.go:158` — `RuleLabels` keeps a row only when the scan gave a
     `string`, although `Table` (engine.go:79) says text may also be `[]byte`.
     Not raised: the only driver is `modernc.org/sqlite` (README.md:234), which
     returns TEXT as `string`, and `TestRuleLabels` asserts the whole list.
 
--   `engine.go:162` — `kind = 'rule'` is a bare literal. Not raised: the kind
+-   `engine.go:152` — `kind = 'rule'` is a bare literal. Not raised: the kind
     vocabulary belongs to the schema, which documents it
     (internal/graphdb/schema.go:12) and uses it in the `rule_dep` view; the
     engine has one query, and a Go constant would be a second source of truth.
+
+-   `engine.go:137` — `scanInto[T]` is the package's only generic function. Not
+    raised: it folds the identical bodies of the old `scanRow` and `scanStrings`
+    into one, and its comment says outright that T buys clarity, not safety,
+    since `rows.Scan` takes `...any` and cannot check T at compile time.
 
 -   `datalog.go:270` — `datalogColumns` drops the variables whose names start
     with `_`. Not raised: that is Mangle's anonymous-variable spelling, used in

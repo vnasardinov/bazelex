@@ -131,7 +131,7 @@ func (e *Engine) datalogFacts(ctx context.Context) ([]ast.Atom, error) {
 				return err
 			}
 			for rows.Next() {
-				vals, err := scanStrings(rows, len(cols))
+				vals, err := scanInto[string](rows, len(cols))
 				if err != nil {
 					return err
 				}

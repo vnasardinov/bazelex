@@ -96,7 +96,7 @@ func eachRow(ctx context.Context, db *sql.DB, query string, f func([]string)) er
 		return err
 	}
 	for rows.Next() {
-		vals, err := scanStrings(rows, len(cols))
+		vals, err := scanInto[string](rows, len(cols))
 		if err != nil {
 			return err
 		}
