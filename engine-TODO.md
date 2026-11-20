@@ -24,7 +24,7 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `70fa07d3c6b89951c86a614ec5ca3f66d694e215` |
+| `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `f2661b620eed40d9bd5eef758fa65a5fd156bf9f` |
 | `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `7c8575a290d5f8b64fcbdabcb614cce841bbf260` |
 | `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `4bf5e16f99b70d3e2c4ab6b892ccdaa8d63b4bd0` |
 | `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
@@ -35,12 +35,6 @@ that differs from its scanned hash has been re-checked since, and its entries'
 line numbers are current for it.
 
 ## Beacon candidates
-
--   `engine.go:46` — `Config.Validate` applies the defaults just to check them
-    and throws them away, and `Open` (engine.go:75) applies them again. A reader
-    has to check that the two copies agree. Have one method return the filled
-    config, e.g. `func (c Config) normalized() (Config, error)`, and let
-    `Validate` and `Open` both be callers of it.
 
 -   `engine.go:17` — `DefaultTimeout`'s doc says it bounds "each query and
     Datalog evaluation", but `evalDatalog` (datalog.go:192) takes no context:

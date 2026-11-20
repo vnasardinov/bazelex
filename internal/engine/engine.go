@@ -30,27 +30,27 @@ type Config struct {
 	MaxFacts int           // how many facts a Datalog program may derive; 0 means DefaultMaxFacts
 }
 
-// withDefaults fills in the zero values so callers only set what they care about.
-func (c Config) withDefaults() Config {
+// normalized fills in the zero values and reports whether the result is usable.
+func (c Config) normalized() (Config, error) {
 	if c.Timeout == 0 {
 		c.Timeout = DefaultTimeout
 	}
 	if c.MaxFacts == 0 {
 		c.MaxFacts = DefaultMaxFacts
 	}
-	return c
+	switch {
+	case c.Timeout < 0:
+		return Config{}, fmt.Errorf("timeout must be positive, got %v", c.Timeout)
+	case c.MaxFacts < 1:
+		return Config{}, fmt.Errorf("max facts must be at least 1, got %d", c.MaxFacts)
+	}
+	return c, nil
 }
 
 // Validate reports whether c, with defaults applied, is usable.
 func (c Config) Validate() error {
-	c = c.withDefaults()
-	switch {
-	case c.Timeout < 0:
-		return fmt.Errorf("timeout must be positive, got %v", c.Timeout)
-	case c.MaxFacts < 1:
-		return fmt.Errorf("max facts must be at least 1, got %d", c.MaxFacts)
-	}
-	return nil
+	_, err := c.normalized()
+	return err
 }
 
 // Engine runs exploration queries over one database. It is safe for concurrent
@@ -69,10 +69,10 @@ type Engine struct {
 // Open returns an Engine over db, which must be a database written by bazelex.
 // It returns an error if cfg is not usable.
 func Open(db *sql.DB, cfg Config) (*Engine, error) {
-	if err := cfg.Validate(); err != nil {
+	cfg, err := cfg.normalized()
+	if err != nil {
 		return nil, err
 	}
-	cfg = cfg.withDefaults()
 	return &Engine{db: db, timeout: cfg.Timeout, maxFacts: cfg.MaxFacts}, nil
 }
 
