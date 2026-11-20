@@ -13,45 +13,44 @@ import (
 	"github.com/vnasardinov/bazelex/internal/graphdb"
 )
 
-// testDB returns the path of a database with a -> b -> c, all rules in package
-// p; a is tagged manual and b is public.
-func testDB(t *testing.T) string {
+// fixtureEngine returns an engine over a database built from stmts, which are
+// executed after the schema.
+func fixtureEngine(t *testing.T, stmts ...string) *Engine {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "g.sqlite")
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	stmts := []string{
-		graphdb.Schema,
+	for _, s := range append([]string{graphdb.Schema}, stmts...) {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+	ro, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ro.Close() })
+	e, err := Open(ro, Config{Timeout: 10 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+// testEngine returns an engine over a fixture with a -> b -> c, all rules in
+// package p; a is tagged manual and b is public.
+func testEngine(t *testing.T) *Engine {
+	t.Helper()
+	return fixtureEngine(t,
 		`INSERT INTO target(id,label,kind,package,name) VALUES
 		  (1,'//p:a','rule','p','a'),(2,'//p:b','rule','p','b'),(3,'//p:c','rule','p','c')`,
 		`INSERT INTO edge VALUES (1,'//p:b',2,'deps',0,0),(2,'//p:c',3,'deps',0,0)`,
 		`INSERT INTO attribute(target_id,name,value) VALUES
 		  (1,'tags','manual'),(2,'visibility','//visibility:public')`,
-	}
-	for _, s := range stmts {
-		if _, err := db.Exec(s); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return path
-}
-
-// testEngine opens the fixture database read-only and returns an engine over it.
-func testEngine(t *testing.T) *Engine {
-	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+testDB(t)+"?mode=ro")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	e, err := Open(db, Config{Timeout: 10 * time.Second})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return e
+	)
 }
 
 func TestQuery(t *testing.T) {

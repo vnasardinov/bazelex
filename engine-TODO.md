@@ -27,8 +27,8 @@ hashes differ, re-check that file's entries.
 | `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `43a8f3471571bc1ccc85839cdff53c44ddaa2d2f` |
 | `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `7c8575a290d5f8b64fcbdabcb614cce841bbf260` |
 | `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `3911ad627e87896f5e56ab0a163e65c593e3a52a` |
-| `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `3bac5f07782bae3a846335945a2f9f3ee6946915` |
-| `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `4c8e8f96848aef356f8e828354f199bd84e43e96` |
+| `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `a9f2c32e650ccfd139a8d6c6cd0767955859893a` |
+| `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `500df3a8035cf9afe30bffdf8a5cbbada5d42507` |
 
 The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`. A "now" hash
 that differs from its scanned hash has been re-checked since, and its entries'
@@ -36,14 +36,8 @@ line numbers are current for it.
 
 ## Beacon candidates
 
--   `engine_test.go:18`, `quotient_test.go:20` — the two fixtures repeat the same
-    open-create-schema-insert-close-reopen-read-only-`Open` dance, and `testDB`
-    returns a path although its name reads like a `*sql.DB`. One
-    `fixtureEngine(t, stmts ...string) *Engine` would leave each fixture as just
-    its rows, so the one-package and cycle fixtures differ only in what matters.
-
--   `engine_test.go:140` — `TestFormat` ends by asserting `IsNumber`
-    (engine_test.go:155), so a reader looking for IsNumber's coverage by test
+-   `engine_test.go:139` — `TestFormat` ends by asserting `IsNumber`
+    (engine_test.go:154), so a reader looking for IsNumber's coverage by test
     name finds none. Split `TestIsNumber` out, or name the test after both.
 
 ## Checked, not a candidate

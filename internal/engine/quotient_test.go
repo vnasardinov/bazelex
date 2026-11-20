@@ -2,16 +2,10 @@ package engine
 
 import (
 	"context"
-	"database/sql"
 	"maps"
-	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 
-	_ "modernc.org/sqlite"
-
-	"github.com/vnasardinov/bazelex/internal/graphdb"
 	"github.com/vnasardinov/bazelex/internal/quotient"
 )
 
@@ -19,32 +13,11 @@ import (
 // c -> b: a and b form a dependency cycle, and c depends on it.
 func cycleEngine(t *testing.T) *Engine {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "g.sqlite")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range []string{
-		graphdb.Schema,
+	return fixtureEngine(t,
 		`INSERT INTO target(id,label,kind,package,name) VALUES
 		  (1,'//a:r','rule','a','r'),(2,'//b:r','rule','b','r'),(3,'//c:r','rule','c','r')`,
 		`INSERT INTO edge VALUES (1,'//b:r',2,'deps',0,0),(2,'//a:r',1,'deps',0,0),(3,'//b:r',2,'deps',0,0)`,
-	} {
-		if _, err := db.Exec(s); err != nil {
-			t.Fatal(err)
-		}
-	}
-	db.Close()
-	ro, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { ro.Close() })
-	e, err := Open(ro, Config{Timeout: 10 * time.Second})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return e
+	)
 }
 
 func TestPackageGraph(t *testing.T) {
