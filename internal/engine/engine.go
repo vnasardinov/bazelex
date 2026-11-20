@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// DefaultTimeout bounds each query and Datalog evaluation when Config does
-	// not say otherwise.
+	// DefaultTimeout bounds each query and the Datalog fact load when Config
+	// does not say otherwise. Mangle's EvalProgram takes no context.
 	DefaultTimeout = 120 * time.Second
 	// DefaultMaxFacts bounds how many facts a Datalog program may derive when
 	// Config does not say otherwise. Datalog always terminates, but the
