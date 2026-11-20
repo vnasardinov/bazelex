@@ -22,7 +22,7 @@ differ, re-check that file's entries.
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
 | `internal/ui/server.go` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` | `1c939ce04050ad366509521850c56b1c8eb26eb8` |
-| `internal/ui/queries.go` | `c6e692ba9d2563849a647537baad64d23546010d` | `c6e692ba9d2563849a647537baad64d23546010d` |
+| `internal/ui/queries.go` | `c6e692ba9d2563849a647537baad64d23546010d` | `51a0d27628bd10d31a25b5f8bcc8872c8cff9111` |
 | `internal/ui/graph.go` | `1f7655703e4a136fdecee00250189dee096af309` | `f785bc839e12c9a59771b1a794ef8079c075b01d` |
 | `internal/ui/datalog.go` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` |
 | `internal/ui/index.html` | `ca4427e7571d0dc1a745c74706f5f64a86a5c1ad` | `ca4427e7571d0dc1a745c74706f5f64a86a5c1ad` |
@@ -36,14 +36,6 @@ The scan ran at commit `d51a00cfcc38d02a5dbe7eec53f0ba5775166190`, and the
 working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Beacon candidates
-
--   `queries.go:177,190,206-208,231` — `Param` literals are unkeyed
-    (`{"target", "Target", "//foo:bar"}`), so the reader must work out which
-    position is `Name` (the bound SQL parameter), which is `Label` (the form
-    label) and which is `Placeholder`, while every `Query` literal in the same
-    file is keyed. Write `Param{Name: ..., Label: ..., Placeholder: ...}`. The
-    three roles then read at the declaration, matching the pattern the file
-    already uses.
 
 -   `server.go:26` (`maxLabels = 20000`) — the cap on the autocompletion `datalist`
     is the one limit in the package that states no reasoning, where

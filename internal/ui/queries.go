@@ -174,7 +174,7 @@ FROM member GROUP BY comp ORDER BY packages DESC, comp;`,
 		ID:          "transitive-deps",
 		Title:       "Transitive dependencies",
 		Description: "Everything a target depends on, directly or indirectly, via deps and embed edges.",
-		Params:      []Param{{"target", "Target", "//foo:bar"}},
+		Params:      []Param{{Name: "target", Label: "Target", Placeholder: "//foo:bar"}},
 		SQL: `WITH RECURSIVE r(id) AS (
   SELECT id FROM target WHERE label = :target
   UNION
@@ -187,7 +187,7 @@ SELECT t.label FROM r JOIN target t ON t.id = r.id;`,
 		ID:          "impact",
 		Title:       "Impact of changing a target",
 		Description: "Every rule that directly or transitively depends on the target (deps and embed edges).",
-		Params:      []Param{{"target", "Target", "//foo:bar"}},
+		Params:      []Param{{Name: "target", Label: "Target", Placeholder: "//foo:bar"}},
 		SQL: `WITH RECURSIVE r(id) AS (
   SELECT id FROM target WHERE label = :target
   UNION
@@ -203,8 +203,8 @@ ORDER BY t.label;`,
 		Title:       "Shortest dependency path",
 		Description: "The shortest chain of deps/embed edges from one target to another (depth limit 20).",
 		Params: []Param{
-			{"from", "From", "//foo:bar"},
-			{"to", "To", "//baz:qux"},
+			{Name: "from", Label: "From", Placeholder: "//foo:bar"},
+			{Name: "to", Label: "To", Placeholder: "//baz:qux"},
 		},
 		SQL: `WITH RECURSIVE
   dep(f, t) AS (
@@ -228,7 +228,7 @@ ORDER BY depth LIMIT 1;`,
 		ID:          "longest-chain",
 		Title:       "Longest dependency chain to a target",
 		Description: "The chain of deps/embed edges, from a top-level rule down to the target, whose length is the target's depth in \"Depth of every rule\". Several chains can tie for the longest; this shows one of them.",
-		Params:      []Param{{"target", "Target", "//foo:bar"}},
+		Params:      []Param{{Name: "target", Label: "Target", Placeholder: "//foo:bar"}},
 		SQL: `WITH RECURSIVE
   roots(id) AS (SELECT from_id FROM rule_dep EXCEPT SELECT to_id FROM rule_dep),
   walk(id, depth) AS (
