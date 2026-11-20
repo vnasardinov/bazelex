@@ -79,8 +79,8 @@ func insertTargets(tx *sql.Tx, r io.Reader) (int, error) {
 			}
 			return n, fmt.Errorf("reading target %d: %w", n+1, err)
 		}
-		tg, ok := describe(t)
-		if !ok || tg.label == "" {
+		tg, stored := describe(t)
+		if !stored || tg.label == "" {
 			continue
 		}
 		if err := w.write(tg, t.GetRule()); err != nil {

@@ -19,7 +19,7 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `9f7ceda50e5af56a0ad0143bcb070200949250d3` |
+| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `d0e3f17c3c0a73a70089087bf3bb79918edd1b71` |
 | `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
 | `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` |
 
@@ -44,11 +44,6 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     number. Give it a name, e.g. `readBufferSize = 1 << 20` with a word on why
     that size, so the reader does not have to decode the shift to learn that
     this is the stream buffer.
-
--   `load.go:150` — `describe` returns an unnamed `bool` that means "stored", so
-    the call site reads `tg, ok := describe(t)`. Name the result `stored` and
-    the call site `tg, stored := describe(t)`: `if !stored || tg.label == ""`
-    then states the reason the target is skipped.
 
 -   `load_test.go:86`, `load_test.go:143` — both tests repeat the open
     `:memory:`, `SetMaxOpenConns(1)`, `Exec(Schema)` preamble. A
