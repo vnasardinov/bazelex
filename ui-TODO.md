@@ -21,7 +21,7 @@ differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/ui/server.go` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` | `1c939ce04050ad366509521850c56b1c8eb26eb8` |
+| `internal/ui/server.go` | `6c05bb2254577de59f3ba2d488e84799ab730a3e` | `054eac865d61334c8908a0d1ee9c8f4326d574f2` |
 | `internal/ui/queries.go` | `c6e692ba9d2563849a647537baad64d23546010d` | `51a0d27628bd10d31a25b5f8bcc8872c8cff9111` |
 | `internal/ui/graph.go` | `1f7655703e4a136fdecee00250189dee096af309` | `f785bc839e12c9a59771b1a794ef8079c075b01d` |
 | `internal/ui/datalog.go` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` | `34d6059fba80cdfdfcc263927f8d3ac2008dfacb` |
@@ -32,17 +32,14 @@ differ, re-check that file's entries.
 | `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `6003643428d98ce89eac11ce7325b0850d7ebf54` |
 | `internal/ui/datalog_test.go` | `aef9cb5245f6da956f1221fd9505c18ecefc40d6` | `aef9cb5245f6da956f1221fd9505c18ecefc40d6` |
 
-The scan ran at commit `d51a00cfcc38d02a5dbe7eec53f0ba5775166190`, and the
-working tree matches it, so "scanned" and "now" are the same for every file.
+The scan ran at commit `d51a00cfcc38d02a5dbe7eec53f0ba5775166190`. A "now" hash
+that differs from its scanned hash has been re-checked since, and its entries'
+line numbers are current for it.
 
 ## Beacon candidates
 
--   `server.go:26` (`maxLabels = 20000`) — the cap on the autocompletion `datalist`
-    is the one limit in the package that states no reasoning, where
-    `maxGraphNodes` (graph.go:30-33), `maxCachedDrawings` (graph.go:165-167) and
-    `maxDatalogRows` (datalog.go:12-14) each explain themselves. Add a one-line
-    comment naming what it bounds (one `<option>` per label, server.go:354) and
-    roughly the size it is chosen for.
+None outstanding: all six candidates are landed. The sections below record
+what is left to know.
 
 ## Checked, not a candidate
 
@@ -58,9 +55,9 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     intended: a package with nothing to draw is reported rather than drawn.
     Carried over from `quotient-TODO.md`, which raised it while renaming `Has`.
 
--   `server.go:160-171` — the goroutines capture `i` and `q` from the range. The
+-   `server.go:162-173` — the goroutines capture `i` and `q` from the range. The
     module's `go 1.26` directive (go.mod:3) guarantees per-iteration loop
-    variables, and `views`' doc comment (server.go:150-155) states the two-phase
+    variables, and `views`' doc comment (server.go:152-157) states the two-phase
     scheduling, so there is no stale-capture trap to flag.
 
 -   `graph.go:170-198` (`drawingCache`) — eviction is insertion order, not

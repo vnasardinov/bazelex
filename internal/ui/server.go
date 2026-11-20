@@ -23,6 +23,8 @@ import (
 	"github.com/vnasardinov/bazelex/internal/engine"
 )
 
+// maxLabels caps the label list offered for autocompletion, so that a large
+// workspace does not put one <option> per rule into the page.
 const maxLabels = 20000
 
 //go:embed index.html
