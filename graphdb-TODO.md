@@ -19,7 +19,7 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `4797d8e78ea19dd778de49c069e78cb33b76d441` |
+| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `9f7ceda50e5af56a0ad0143bcb070200949250d3` |
 | `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
 | `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` |
 
@@ -27,11 +27,6 @@ The scan ran at commit `c1e35948f23dc7d37ad7e2988656fc4e1141b13f`, and the
 working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Beacon candidates
-
--   `load.go:203` — `attributeEdges`'s `emit` parameter is named `attr`, which
-    shadows the package's `attr` type and makes the edge literal (load.go:205)
-    read `attr: attr`. Rename it `attrName`, so the literal shows which side is
-    the field and which the source, and the type stays reachable inside `emit`.
 
 -   `load_test.go:16` — `labelAttr` builds every test attribute, not only label
     ones: it is called for `name` (STRING), `tags` (STRING_LIST) and `size`

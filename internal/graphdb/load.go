@@ -200,9 +200,9 @@ func ruleEdges(r *bpb.Rule) []edge {
 // value, and those of every branch of its select(), if it has one.
 func attributeEdges(a *bpb.Attribute) []edge {
 	var edges []edge
-	emit := func(attr string, inSelect bool, labels []string) {
+	emit := func(attrName string, inSelect bool, labels []string) {
 		for _, l := range labels {
-			edges = append(edges, edge{to: l, attr: attr, inSelect: inSelect, nodep: a.GetNodep()})
+			edges = append(edges, edge{to: l, attr: attrName, inSelect: inSelect, nodep: a.GetNodep()})
 		}
 	}
 
