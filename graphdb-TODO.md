@@ -21,18 +21,15 @@ hashes differ, re-check that file's entries.
 | --- | --- | --- |
 | `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `98f19fa6693f5103e0c792ca36dee39379140141` |
 | `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
-| `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `41d1646c1c794c705e3f671780e63a4aae4d1464` |
+| `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `07570978696c9e271c313c117d96964142c9887e` |
 
 The scan ran at commit `c1e35948f23dc7d37ad7e2988656fc4e1141b13f`, and the
 working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Beacon candidates
 
--   `load_test.go:86`, `load_test.go:143` — both tests repeat the open
-    `:memory:`, `SetMaxOpenConns(1)`, `Exec(Schema)` preamble. A
-    `testDB(t) *sql.DB` helper would leave each test as its `Load` call and its
-    query, and hold the "each in-memory connection is its own database" note
-    once.
+None outstanding: all eight candidates are landed. The sections below record
+what is left to know.
 
 ## Checked, not a candidate
 
@@ -54,7 +51,7 @@ working tree matches it, so "scanned" and "now" are the same for every file.
     lines apart, so the repetition marks the exception.
 
 -   `load.go:319` — `splitLabel`'s comment shows only the `//pkg:name` form, but
-    `TestSplitLabel` (load_test.go:183) asserts the no-colon form (`//a/b` ->
+    `TestSplitLabel` (load_test.go:182) asserts the no-colon form (`//a/b` ->
     `a/b`, `b`) and `//:root`, so the behavior is pinned by a test and the
     example is illustrative rather than the whole contract.
 
@@ -66,7 +63,7 @@ working tree matches it, so "scanned" and "now" are the same for every file.
 
 ## Deferred
 
--   `load_test.go:120`, `load_test.go:165` — the row loops stop at `rows.Next()`
+-   `load_test.go:127`, `load_test.go:164` — the row loops stop at `rows.Next()`
     without the usual `rows.Err()` check that `QueryPage` makes (engine.go:129).
     Adding it would change what a mid-iteration driver error does (fail the
     test instead of passing with the rows read so far), so it is a test

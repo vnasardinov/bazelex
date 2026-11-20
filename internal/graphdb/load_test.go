@@ -83,16 +83,23 @@ func testStream(t *testing.T) *bytes.Buffer {
 	return &buf
 }
 
-func TestLoad(t *testing.T) {
+// testDB returns an in-memory database with the schema applied.
+func testDB(t *testing.T) *sql.DB {
+	t.Helper()
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	db.SetMaxOpenConns(1) // each in-memory connection is its own database
 	if _, err := db.Exec(Schema); err != nil {
 		t.Fatal(err)
 	}
+	return db
+}
+
+func TestLoad(t *testing.T) {
+	db := testDB(t)
 
 	n, err := Load(db, testStream(t))
 	if err != nil {
@@ -141,15 +148,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestLoadAttributes(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(Schema); err != nil {
-		t.Fatal(err)
-	}
+	db := testDB(t)
 	if _, err := Load(db, testStream(t)); err != nil {
 		t.Fatal(err)
 	}
