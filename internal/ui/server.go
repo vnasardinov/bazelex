@@ -274,7 +274,7 @@ func (v *queryView) addGraphLinks() {
 		return
 	}
 	for _, row := range v.Rows {
-		row[col].URL = graphURL(row[col].Text, defaultDepth, true)
+		row[col].URL = graphURL(graphKey{pkg: row[col].Text, depth: defaultDepth, cycle: true, by: byPackage})
 		row[col].NewTab = true
 	}
 }

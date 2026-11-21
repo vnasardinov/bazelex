@@ -164,3 +164,46 @@ func TestComponentIndexIsolatedNode(t *testing.T) {
 		t.Errorf("Components() = %v, want %v", got, want)
 	}
 }
+
+func TestLayers(t *testing.T) {
+	// The condensation of x <-> y -> z -> w: the cycle x, then z, then w.
+	q := Condense(testGraph())
+	want := [][]string{{"x"}, {"z"}, {"w"}}
+	if got := Layers(q); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("Layers() = %v, want %v", got, want)
+	}
+}
+
+func TestLayersBranches(t *testing.T) {
+	// a -> b -> d and a -> c -> d: b and c share a layer, and d waits for both.
+	g := New()
+	g.Add("a", "b", 1)
+	g.Add("a", "c", 1)
+	g.Add("b", "d", 1)
+	g.Add("c", "d", 1)
+	want := [][]string{{"a"}, {"b", "c"}, {"d"}}
+	if got := Layers(g); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("Layers() = %v, want %v", got, want)
+	}
+}
+
+func TestLayersIsolatedNode(t *testing.T) {
+	g := New()
+	g.AddNode("lonely")
+	if got, want := Layers(g), [][]string{{"lonely"}}; !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("Layers() = %v, want %v", got, want)
+	}
+}
+
+func TestLayersCycle(t *testing.T) {
+	// A cycle has no layering: everything it can't place comes back as one last
+	// layer. Condense never leaves a cycle, so this is the degenerate case.
+	g := New()
+	g.Add("a", "b", 1)
+	g.Add("b", "a", 1)
+	g.Add("b", "c", 1)
+	want := [][]string{{"a", "b", "c"}}
+	if got := Layers(g); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("Layers() = %v, want %v", got, want)
+	}
+}

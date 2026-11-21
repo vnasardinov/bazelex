@@ -16,18 +16,29 @@
 </head>
 <body>
 <p><a href=".">&larr; bazelex</a> &middot; <a href="datalog">Datalog</a></p>
-<h1>Package graph</h1>
+<h1>{{if .SCC}}Component graph{{else}}Package graph{{end}}</h1>
+{{if .SCC}}
+<p class="note">Rule dependencies collapsed by package and then by strongly connected
+component, from <code>{{.DB}}</code>. Each node is a strongly connected component: one
+package, or a dependency cycle named after its smallest member, with a number after the
+name for how many packages it holds. The graph is acyclic, so it is drawn in topological
+layers: a component sits after everything it depends on. Click a component to center the
+graph on it.</p>
+{{else}}
 <p class="note">Rule dependencies collapsed by package, from <code>{{.DB}}</code>. A thicker edge stands for more
 rule-to-rule dependencies; hover over it for the count. Click a package to center the graph on it.</p>
+{{end}}
 <form method="get" action="graph">
+  {{if .SCC}}<input type="hidden" name="by" value="scc">{{end}}
   <label>Package <input type="text" name="pkg" value="{{.Pkg}}" placeholder="path/to/package"></label>
   <label>Depth <input type="number" name="depth" min="0" max="{{.MaxDepth}}" value="{{.Depth}}" style="width:4em"></label>
-  <label><input type="checkbox" name="cycle" value="1"{{if .Cycle}} checked{{end}}> Center on the whole dependency cycle</label>
+  {{if not .SCC}}<label><input type="checkbox" name="cycle" value="1"{{if .Cycle}} checked{{end}}> Center on the whole dependency cycle</label>{{end}}
   <button type="submit">Draw</button>
 </form>
 {{if .Err}}<p class="err">{{.Err}}</p>
 {{else if .HasPkg}}
-<p class="note">{{.Nodes}} packages{{if gt .CycleSize 1}}; <code>{{.Pkg}}</code> is in a dependency cycle of {{.CycleSize}} packages (red){{end}}.
+<p class="note">{{if .SCC}}{{.Nodes}} components{{if gt .CycleSize 1}}; <code>{{.Pkg}}</code> is in a dependency cycle of {{.CycleSize}} packages{{end}}.{{else}}{{.Nodes}} packages{{if gt .CycleSize 1}}; <code>{{.Pkg}}</code> is in a dependency cycle of {{.CycleSize}} packages (red){{end}}.{{end}}
+{{if .SwitchURL}}<a href="{{.SwitchURL}}">Show the {{if .SCC}}package{{else}}component{{end}} graph</a>.{{end}}
 Gold is the center.</p>
 {{if .Notice}}<p class="note">{{.Notice}}</p>{{end}}
 <p class="note">Download: <a href="{{.DotURL}}">.dot</a> &middot; <a href="{{.SVGURL}}">.svg</a></p>

@@ -101,6 +101,14 @@ and asking for it again is instant. New drawings are laid out one at a time
 with a single shared Graphviz instance, so a slow layout delays every other
 request for a drawing that is not cached yet.
 
+`by=scc` draws the other quotient instead: the package graph condensed by its
+strongly connected components, so each node is a dependency cycle, named after
+its smallest member, with the number of packages it holds when it is a real
+cycle. The condensation is acyclic, so it is laid out in topological layers, a
+component one layer past everything that depends on it. `by=scc&pkg=...` takes a
+package and centers on its component. The page links between the two quotients,
+so a package with a cycle in its neighborhood can be read either way.
+
 A third page, `/datalog`, runs a [Mangle](https://github.com/google/mangle)
 (Datalog) program over the same graph. On first use it translates the database
 into facts: `target(Label, Kind, Package)`, `dep(From, To)` (rule-to-rule `deps`

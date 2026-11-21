@@ -207,8 +207,11 @@ most.
     -   Done: SQL support. The three tables hold the same rows the
         Datalog facts do, so a query reads `qmember` where the README's
         cycle query needs a quadratic reachability.
-    -   Next: `/graph?by=scc`, drawing the condensed graph; and a
-        topological layering of the components.
+    -   Done: `/graph?by=scc`, drawing the condensed graph, with a topological
+        layering. A component is drawn as a node labeled with its size when it
+        is a real cycle, and `quotient.Layers` groups the components into layers
+        by longest path from one nothing depends on, which the DOT draws as
+        `rank=same` groups. The page links between the two quotients.
 -   **By transitive-dependency signature.** Group targets with identical
     (or nearly identical) transitive closures. These are targets that
     are effectively interchangeable from the build's point of view,

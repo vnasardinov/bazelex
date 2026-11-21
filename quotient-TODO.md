@@ -19,17 +19,19 @@ hashes differ, re-check that file's entries.
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
 | `internal/quotient/graph.go` | `08997bc4f0b34448e8fe7bf04a8945cc8ac28b74` | `b4068c162ee732cde64db6bf1b7fa485afed3c27` |
-| `internal/quotient/partition.go` | `c218903cbfa3c61325e0b917ecd86c8446168e56` | `6c372301c8a25a619b681b936d3514b015a0eac5` |
+| `internal/quotient/partition.go` | `c218903cbfa3c61325e0b917ecd86c8446168e56` | `75fc96c167e7325b0256f01e9cd18aa1091dc506` |
 | `internal/quotient/scc.go` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` | `c41601982da9b186a83b246fcfc5d5e27d98e440` |
-| `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` | `07969c278e88d22c7984e455e61ffddb991db12a` |
-| `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `1f7655703e4a136fdecee00250189dee096af309` |
-| `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `2a88bff24bc2d4b9227b78fa0f240030e67ae0ac` |
+| `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` | `a0b8e0797631303c6a34a8d6acde848c3a40f750` |
+| `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `81c3181bd3918bb78a1967d535d303188dd1faa4` |
+| `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `16364dfc715df411cfd9794c09beea2095432284` |
 
 `internal/ui/graph_test.go` has moved since the scan: its fixtures grew the
 quotient tables the engine reads back, which shifted the entry below. Everything
 else has moved as its candidates landed, but those moves were renames and
-same-line edits, so the recorded line numbers still hold. Re-check a file's
-entries if its hash has changed since this table was written.
+same-line edits, so the recorded line numbers still hold; the `Layers` work
+moved `partition.go` and `quotient_test.go`, and `/graph?by=scc` moved
+`internal/ui/graph.go`. Re-check a file's entries if its hash has changed since
+this table was written.
 `internal/engine/` is anchored in `engine-TODO.md`, whose scan took over those
 rows; `internal/ui/` as a whole is anchored in `ui-TODO.md`.
 
@@ -41,7 +43,7 @@ The sections below record what is left to know.
 
 ## Checked, not a candidate
 
--   `internal/ui/graph.go:218` — the page asks whether a package exists and
+-   `internal/ui/graph.go:307` — the page asks whether a package exists and
     reads false for a package that is a node with no cross-package edge. That is
     what `nothingToDrawError` documents and its message states ("has no
     dependencies on or from other packages"), and `internal/ui/graph_test.go:56`

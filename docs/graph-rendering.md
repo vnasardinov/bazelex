@@ -27,6 +27,13 @@ Things to know:
   `nslimit=1` and `mclimit=0.2`, and at most 60 nodes, a page renders in about
   half a second.  Edge weights are shown as line width and a tooltip instead of
   labels.
+* The component graph (`/graph?by=scc`) is drawn in topological layers: the
+  condensation is acyclic, so `quotient.Layers` groups its components by longest
+  path from one nothing depends on, and each layer becomes a `rank=same`
+  subgraph in the DOT. Grouping by the whole condensation's layers rather than
+  the drawn neighborhood's keeps a component's layer the same from every
+  viewpoint, and no edge can join two nodes of one group, so the layering holds
+  for the subgraph too.
 
 ## Alternatives not taken
 

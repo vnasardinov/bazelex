@@ -111,6 +111,8 @@ func TestGraphDownloads(t *testing.T) {
 	}{
 		{"/graph.dot?pkg=a/x&depth=1", "text/vnd.graphviz; charset=utf-8", `attachment; filename=graph-a_x-depth1.dot`, "digraph"},
 		{"/graph.svg?pkg=a/x&depth=1&cycle=1", "image/svg+xml", `attachment; filename=graph-a_x-depth1-cycle.svg`, "<svg"},
+		// The component graph is layered, so its DOT groups nodes by rank.
+		{"/graph.dot?by=scc&pkg=a/x&depth=1", "text/vnd.graphviz; charset=utf-8", `attachment; filename=graph-scc-a_x-depth1.dot`, "{ rank=same;"},
 	} {
 		w := fetch(c.url)
 		if w.Code != 200 || w.Header().Get("Content-Type") != c.contentType ||
@@ -123,6 +125,57 @@ func TestGraphDownloads(t *testing.T) {
 	}
 	if w := fetch("/graph.svg"); w.Code != 400 {
 		t.Errorf("no package: status %d", w.Code)
+	}
+}
+
+func TestGraphComponentPage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "g.sqlite")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Packages a and b form a cycle (component a), which depends on c.
+	for _, s := range []string{
+		graphdb.Schema,
+		`INSERT INTO target(id,label,kind,package,name) VALUES
+		  (1,'//a:r','rule','a','r'),(2,'//b:r','rule','b','r'),(3,'//c:r','rule','c','r')`,
+		`INSERT INTO edge VALUES (1,'//b:r',2,'deps',0,0),(2,'//a:r',1,'deps',0,0),(2,'//c:r',3,'deps',0,0)`,
+		// The quotient tables bazelex writes: a and b form a cycle, named a,
+		// and b depends on c.
+		`INSERT INTO qnode(quotient,node) VALUES
+		  ('package','a'),('package','b'),('package','c'),('scc','a'),('scc','c')`,
+		`INSERT INTO qedge(quotient,from_node,to_node,weight) VALUES
+		  ('package','a','b',1),('package','b','a',1),('package','b','c',1),('scc','a','c',1)`,
+		`INSERT INTO qmember(quotient,node,member) VALUES
+		  ('scc','a','a'),('scc','a','b'),('scc','c','c')`,
+	} {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	// b is in the cycle named a, so the page centers on that component.
+	body := get(t, path, "/graph?by=scc&pkg=b&depth=1")
+	for _, want := range []string{
+		"<svg",
+		"Component graph",
+		"2 components; <code>b</code> is in a dependency cycle of 2 packages.",
+		"graph?cycle=1&amp;depth=1&amp;pkg=b", // the same view over the package graph
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page missing %q", want)
+		}
+	}
+	// The DOT names the cycle by size, layers it, and links on to its dependency.
+	dot := get(t, path, "/graph.dot?by=scc&pkg=b&depth=1")
+	for _, want := range []string{`label="a (2)"`, "{ rank=same;", "graph?by=scc&depth=1&pkg=c"} {
+		if !strings.Contains(dot, want) {
+			t.Errorf("DOT missing %q:\n%s", want, dot)
+		}
+	}
+	if !strings.Contains(get(t, path, "/graph?by=scc&pkg=nope"), "no dependencies") {
+		t.Error("unknown package should be reported")
 	}
 }
 
