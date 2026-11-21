@@ -50,6 +50,10 @@ func testEngine(t *testing.T) *Engine {
 		`INSERT INTO edge VALUES (1,'//p:b',2,'deps',0,0),(2,'//p:c',3,'deps',0,0)`,
 		`INSERT INTO attribute(target_id,name,value) VALUES
 		  (1,'tags','manual'),(2,'visibility','//visibility:public')`,
+		// The quotient tables bazelex writes: one package with no
+		// cross-package edge, so one node in each quotient.
+		`INSERT INTO qnode(quotient,node) VALUES ('package','p'),('scc','p')`,
+		`INSERT INTO qmember(quotient,node,member) VALUES ('scc','p','p')`,
 	)
 }
 

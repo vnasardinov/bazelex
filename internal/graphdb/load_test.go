@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"slices"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -182,6 +183,95 @@ func TestLoadAttributes(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("attributes mismatch\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// cycleStream returns a stream whose rules are //a:r <-> //b:r and //c:r ->
+// //b:r, so packages a and b form a dependency cycle and c depends on it.
+func cycleStream(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	targets := []*bpb.Target{
+		rule("//a:r", "go_library", nil, newAttr("deps", bpb.Attribute_LABEL_LIST, "", "//b:r")),
+		rule("//b:r", "go_library", nil, newAttr("deps", bpb.Attribute_LABEL_LIST, "", "//a:r")),
+		rule("//c:r", "go_library", nil, newAttr("deps", bpb.Attribute_LABEL_LIST, "", "//b:r")),
+	}
+	var buf bytes.Buffer
+	for _, tg := range targets {
+		if _, err := protodelim.MarshalTo(&buf, tg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return &buf
+}
+
+// queryRows returns the rows of query, one string per row with the columns
+// joined by spaces, so that a test can compare a whole table at once.
+func queryRows(t *testing.T, db *sql.DB, query string) []string {
+	t.Helper()
+	rows, err := db.Query(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for rows.Next() {
+		vals := make([]string, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, strings.Join(vals, " "))
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func TestLoadQuotients(t *testing.T) {
+	db := testDB(t)
+	if _, err := Load(db, cycleStream(t)); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		table, query string
+		want         []string
+	}{
+		{"qnode", `SELECT quotient, node FROM qnode ORDER BY quotient, node`,
+			[]string{"package a", "package b", "package c", "scc a", "scc c"}},
+		{"qedge", `SELECT quotient, from_node, to_node, weight FROM qedge ORDER BY quotient, from_node, to_node`,
+			[]string{"package a b 1", "package b a 1", "package c b 1", "scc c a 1"}},
+		{"qmember", `SELECT quotient, node, member FROM qmember ORDER BY quotient, node, member`,
+			[]string{"scc a a", "scc a b", "scc c c"}},
+	} {
+		if got := queryRows(t, db, c.query); !slices.Equal(got, c.want) {
+			t.Errorf("%s = %v, want %v", c.table, got, c.want)
+		}
+	}
+}
+
+func TestLoadQuotientLonePackage(t *testing.T) {
+	// The stream's only rule-to-rule edge is within package a, so a is a node
+	// of both quotients with no edge, and a component of its own.
+	db := testDB(t)
+	if _, err := Load(db, testStream(t)); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := queryRows(t, db, `SELECT quotient, node FROM qnode ORDER BY quotient`), []string{"package a", "scc a"}; !slices.Equal(got, want) {
+		t.Errorf("qnode = %v, want %v", got, want)
+	}
+	if got := queryRows(t, db, `SELECT quotient, from_node, to_node FROM qedge`); len(got) != 0 {
+		t.Errorf("qedge = %v, want no rows", got)
+	}
+	if got, want := queryRows(t, db, `SELECT quotient, node, member FROM qmember`), []string{"scc a a"}; !slices.Equal(got, want) {
+		t.Errorf("qmember = %v, want %v", got, want)
 	}
 }
 

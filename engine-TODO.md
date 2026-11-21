@@ -2,8 +2,8 @@
 
 Beacon candidates for the `internal/engine` package (`Config`/`Engine`,
 `Query`/`QueryPage`/`RuleLabels`/`Format`/`IsNumber`, the Datalog evaluation, and
-the package-quotient loaders), found by scanning the package for places where a
-reader has to work out what the code does. A beacon is a name, idiom or shape
+the quotient readers), found by scanning the package for places where a reader
+has to work out what the code does. A beacon is a name, idiom or shape
 that lets a reader confirm intent without reading every line. Nothing here
 changes behavior; each entry is a rewrite candidate. Files are named relative to
 `internal/engine/`.
@@ -25,15 +25,16 @@ hashes differ, re-check that file's entries.
 | --- | --- | --- |
 | `internal/engine/engine.go` | `120d4096b53cd93c15869a7de662234887a0cab5` | `89b169d7172c7c6cf565d5c2ae646d9f50db4922` |
 | `internal/engine/datalog.go` | `df9a600c83fef0433fc1f94491a1b5cdd56c2742` | `b2303952e64e5fa177640db357b0c2e355543436` |
-| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `f3a6d4631fd948fffa6bca3181a31c3f77ebcb8d` |
-| `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `7b0cbcb7208d375d64d7bd2423f2df7415166d26` |
-| `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `500df3a8035cf9afe30bffdf8a5cbbada5d42507` |
+| `internal/engine/quotient.go` | `480cbcb736d449a766d88891b49fdbd53dddda3e` | `a168577ccf34d5e718cfd6faa861eb3b07fad805` |
+| `internal/engine/engine_test.go` | `3bac5f07782bae3a846335945a2f9f3ee6946915` | `8ca3ed3d299c64c2acb734df0dd339a0f4dea718` |
+| `internal/engine/quotient_test.go` | `4c8e8f96848aef356f8e828354f199bd84e43e96` | `840fec713608991852f4a20b5ec04a2c8568914e` |
 
 The scan ran at commit `0fcc082a4cfa89e0fedd77debb4c2ed59409228d`. A "now" hash
 that differs from its scanned hash has been re-checked since, and its entries'
-line numbers are current for it. The `now` column was last refreshed after
-`scanInto` replaced the duplicate `scanRow` and `scanStrings`, which shortened
-`engine.go` by ten lines; the entries below are current for that revision.
+line numbers are current for it. The `now` column was last refreshed after the
+quotient tables moved to `internal/graphdb`: `quotient.go` reads them back
+instead of deriving them, and the two test fixtures write the rows the engine
+reads. The entries below are current for that revision.
 
 ## Beacon candidates
 

@@ -141,34 +141,13 @@ ORDER BY edges + back_edges DESC, edges DESC, a.from_pkg, a.to_pkg;`,
 	{
 		ID:          "package-cycles",
 		Title:       "Package dependency cycles",
-		Description: "Groups of packages that depend on each other, directly or through other packages. Bazel allows this between packages as long as no rules form a cycle, but it makes the packages impossible to layer. This computes the reachability closure over packages, so it can be slow on large graphs.",
-		Expensive:   true,
+		Description: "Groups of packages that depend on each other, directly or through other packages. Bazel allows this between packages as long as no rules form a cycle, but it makes the packages impossible to layer. bazelex writes the components at load time, so this reads the qmember table rather than computing the reachability closure.",
 		GraphColumn: "comp",
-		SQL: `WITH RECURSIVE
-  pkg_dep(a, b) AS (
-    SELECT DISTINCT f.package, t.package
-    FROM rule_dep d
-    JOIN target f ON f.id = d.from_id
-    JOIN target t ON t.id = d.to_id
-    WHERE f.package <> t.package
-  ),
-  reach(a, b) AS (
-    SELECT a, b FROM pkg_dep
-    UNION
-    SELECT reach.a, pkg_dep.b FROM reach JOIN pkg_dep ON pkg_dep.a = reach.b
-  ),
-  -- A package is in a cycle if it reaches itself. Its component is every
-  -- package it reaches and that reaches it back, named by the smallest one.
-  member(pkg, comp) AS (
-    SELECT self.a, MIN(fwd.b)
-    FROM reach self
-    JOIN reach fwd ON fwd.a = self.a
-    JOIN reach back ON back.a = fwd.b AND back.b = self.a
-    WHERE self.b = self.a
-    GROUP BY self.a
-  )
-SELECT comp, COUNT(*) AS packages, GROUP_CONCAT(pkg, ', ') AS members
-FROM member GROUP BY comp ORDER BY packages DESC, comp;`,
+		SQL: `-- Only a component of more than one package is a cycle.
+SELECT node AS comp, COUNT(*) AS packages, GROUP_CONCAT(member, ', ') AS members
+FROM qmember WHERE quotient = 'scc'
+GROUP BY node HAVING COUNT(*) > 1
+ORDER BY packages DESC, node;`,
 	},
 	{
 		ID:          "transitive-deps",

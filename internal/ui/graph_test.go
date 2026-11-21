@@ -32,6 +32,14 @@ func TestGraphPage(t *testing.T) {
 		`INSERT INTO target(id,label,kind,package,name) VALUES
 		  (1,'//a:r','rule','a','r'),(2,'//b:r','rule','b','r'),(3,'//c:r','rule','c','r')`,
 		`INSERT INTO edge VALUES (1,'//b:r',2,'deps',0,0),(2,'//a:r',1,'deps',0,0),(2,'//c:r',3,'deps',0,0)`,
+		// The quotient tables bazelex writes: a and b form a cycle, named a,
+		// and b depends on c.
+		`INSERT INTO qnode(quotient,node) VALUES
+		  ('package','a'),('package','b'),('package','c'),('scc','a'),('scc','c')`,
+		`INSERT INTO qedge(quotient,from_node,to_node,weight) VALUES
+		  ('package','a','b',1),('package','b','a',1),('package','b','c',1),('scc','a','c',1)`,
+		`INSERT INTO qmember(quotient,node,member) VALUES
+		  ('scc','a','a'),('scc','a','b'),('scc','c','c')`,
 	} {
 		if _, err := db.Exec(s); err != nil {
 			t.Fatal(err)
@@ -64,6 +72,12 @@ func TestGraphDownloads(t *testing.T) {
 		`INSERT INTO target(id,label,kind,package,name) VALUES
 		  (1,'//a/x:r','rule','a/x','r'),(2,'//b:r','rule','b','r')`,
 		`INSERT INTO edge VALUES (1,'//b:r',2,'deps',0,0)`,
+		// The quotient tables bazelex writes: a/x depends on b, no cycle.
+		`INSERT INTO qnode(quotient,node) VALUES
+		  ('package','a/x'),('package','b'),('scc','a/x'),('scc','b')`,
+		`INSERT INTO qedge(quotient,from_node,to_node,weight) VALUES
+		  ('package','a/x','b',1),('scc','a/x','b',1)`,
+		`INSERT INTO qmember(quotient,node,member) VALUES ('scc','a/x','a/x'),('scc','b','b')`,
 	} {
 		if _, err := db.Exec(s); err != nil {
 			t.Fatal(err)
@@ -145,6 +159,10 @@ func TestDrawingIsCached(t *testing.T) {
 		graphdb.Schema,
 		`INSERT INTO target(id,label,kind,package,name) VALUES (1,'//a:r','rule','a','r'),(2,'//b:r','rule','b','r')`,
 		`INSERT INTO edge VALUES (1,'//b:r',2,'deps',0,0)`,
+		// The quotient tables bazelex writes: a depends on b, no cycle.
+		`INSERT INTO qnode(quotient,node) VALUES ('package','a'),('package','b'),('scc','a'),('scc','b')`,
+		`INSERT INTO qedge(quotient,from_node,to_node,weight) VALUES ('package','a','b',1),('scc','a','b',1)`,
+		`INSERT INTO qmember(quotient,node,member) VALUES ('scc','a','a'),('scc','b','b')`,
 	} {
 		if _, err := db.Exec(s); err != nil {
 			t.Fatal(err)

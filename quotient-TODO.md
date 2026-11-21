@@ -23,13 +23,15 @@ hashes differ, re-check that file's entries.
 | `internal/quotient/scc.go` | `2a3fa70488ab2ffb5530387fca5b030392eb30ec` | `c41601982da9b186a83b246fcfc5d5e27d98e440` |
 | `internal/quotient/quotient_test.go` | `55ba946cf213b6205f27d282ba6d70b3a5fcae9b` | `07969c278e88d22c7984e455e61ffddb991db12a` |
 | `internal/ui/graph.go` | `3d6798a686f3e8d0cccf08ad1b4273ef3c8dd61d` | `1f7655703e4a136fdecee00250189dee096af309` |
-| `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `e9788fa805af21975260fe5090fc594bf846fbb6` |
+| `internal/ui/graph_test.go` | `e9788fa805af21975260fe5090fc594bf846fbb6` | `2a88bff24bc2d4b9227b78fa0f240030e67ae0ac` |
 
-`internal/ui/graph_test.go` is untouched since the scan; everything else has
-moved as its candidates landed, but the moves were renames and same-line edits,
-so the recorded line numbers still hold. Re-check a file's entries if its hash
-has changed since this table was written. `internal/engine/` is anchored in
-`engine-TODO.md`, whose scan took over those rows.
+`internal/ui/graph_test.go` has moved since the scan: its fixtures grew the
+quotient tables the engine reads back, which shifted the entry below. Everything
+else has moved as its candidates landed, but those moves were renames and
+same-line edits, so the recorded line numbers still hold. Re-check a file's
+entries if its hash has changed since this table was written.
+`internal/engine/` is anchored in `engine-TODO.md`, whose scan took over those
+rows; `internal/ui/` as a whole is anchored in `ui-TODO.md`.
 
 ## Beacon candidates
 
@@ -42,7 +44,7 @@ The sections below record what is left to know.
 -   `internal/ui/graph.go:218` — the page asks whether a package exists and
     reads false for a package that is a node with no cross-package edge. That is
     what `nothingToDrawError` documents and its message states ("has no
-    dependencies on or from other packages"), and `internal/ui/graph_test.go:48`
+    dependencies on or from other packages"), and `internal/ui/graph_test.go:56`
     asserts it, so it is intended: a package with nothing to draw is reported
     rather than drawn. Earlier noted as a bug while renaming `Has`; not one.
 

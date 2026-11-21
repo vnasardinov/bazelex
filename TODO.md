@@ -195,15 +195,20 @@ most.
     useful quotients because the condensation is always a DAG, so you
     get a clean topological layering for free.
     -   Done: the condensation is computed in Go (Tarjan, iterative) by
-        `internal/quotient` and exposed by `Engine.CondensedGraph`. It
-        is offered to Datalog as facts on the `/datalog` page (and the
-        CLI): `qmember("scc", Component, Package)` maps each package to
-        its component, named after its smallest member, and
+        `internal/quotient`. `internal/graphdb` runs it at load time and
+        writes the package graph and the condensation into the `qnode`,
+        `qedge` and `qmember` tables, and the engine reads them back.
+        Both are offered to Datalog as facts on the `/datalog` page (and
+        the CLI): `qmember("scc", Component, Package)` maps each package
+        to its component, named after its smallest member, and
         `qedge("scc", From, To, N)` is the component graph. The generic
-        quotient facts are `qnode`/`qedge`/`qmember`, parameterized by
-        the quotient name, so the package quotient rides along.
-    -   Next: SQL support (no `/graph?by=scc` yet) and drawing the
-        condensed graph; and a topological layering of the components.
+        facts are `qnode`/`qedge`/`qmember`, parameterized by the
+        quotient name, so the package quotient rides along.
+    -   Done: SQL support. The three tables hold the same rows the
+        Datalog facts do, so a query reads `qmember` where the README's
+        cycle query needs a quadratic reachability.
+    -   Next: `/graph?by=scc`, drawing the condensed graph; and a
+        topological layering of the components.
 -   **By transitive-dependency signature.** Group targets with identical
     (or nearly identical) transitive closures. These are targets that
     are effectively interchangeable from the build's point of view,

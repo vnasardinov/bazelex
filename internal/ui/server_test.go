@@ -305,6 +305,14 @@ func TestPackageCoupling(t *testing.T) {
 		  (6,'//w:e','rule','w','e'),(7,'//w:f','rule','w','f')`,
 		`INSERT INTO edge VALUES (1,'//y:b',3,'deps',0,0),(2,'//y:b',3,'deps',0,0),
 		  (3,'//x:c',4,'deps',0,0),(3,'//z:d',5,'deps',0,0),(6,'//w:f',7,'deps',0,0)`,
+		// The quotient tables bazelex writes: x and y form a cycle, named x,
+		// and y depends on z.
+		`INSERT INTO qnode(quotient,node) VALUES
+		  ('package','x'),('package','y'),('package','z'),('package','w'),('scc','x'),('scc','z'),('scc','w')`,
+		`INSERT INTO qedge(quotient,from_node,to_node,weight) VALUES
+		  ('package','x','y',2),('package','y','x',1),('package','y','z',1),('scc','x','z',1)`,
+		`INSERT INTO qmember(quotient,node,member) VALUES
+		  ('scc','x','x'),('scc','x','y'),('scc','z','z'),('scc','w','w')`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

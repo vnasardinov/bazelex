@@ -48,6 +48,38 @@ CREATE INDEX edge_to_id ON edge(to_id);
 CREATE INDEX edge_to_label ON edge(to_label);
 CREATE INDEX target_package ON target(package);
 
+-- Quotient graphs of the target graph, written by bazelex after loading, so
+-- that they can be explored with SQL instead of re-derived per query (a SQL
+-- condensation would need a quadratic reachability). The quotient column says
+-- which quotient a row belongs to: "package" is the rule graph collapsed by
+-- package, and "scc" is that graph condensed by its strongly connected
+-- components, which merges each package dependency cycle into one node and is
+-- always a DAG. The tables mirror the Datalog facts qnode/2, qedge/4 and
+-- qmember/3 one for one.
+CREATE TABLE qnode (
+  quotient TEXT NOT NULL, -- package, scc
+  node     TEXT NOT NULL  -- a package, or a component named after its smallest member
+);
+
+CREATE TABLE qedge (
+  quotient  TEXT NOT NULL,
+  from_node TEXT NOT NULL,
+  to_node   TEXT NOT NULL,
+  weight    INTEGER NOT NULL -- number of underlying rule dependencies
+);
+
+-- Which package collapses into which component. Only the "scc" quotient has
+-- members here: the package quotient's members are rules, which target holds.
+CREATE TABLE qmember (
+  quotient TEXT NOT NULL,
+  node     TEXT NOT NULL, -- the component
+  member   TEXT NOT NULL  -- a package in it
+);
+
+-- No indexes: unlike edge and target, these tables stay small (the package
+-- graph of a 26k-target repo is about 18k edges), so a scan is instant and an
+-- index on qedge would cost more than the table it indexes.
+
 -- Rule-to-rule dependencies: the building block of the recursive queries.
 -- Only deps and embed edges count (go_binary embeds its library), and both
 -- ends must be rules in the loaded graph.

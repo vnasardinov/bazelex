@@ -42,7 +42,9 @@ type target struct {
 
 // Load reads a stream of length-delimited bazel Target messages (the output of
 // `bazel query --output=streamed_proto`) and writes them into db, which must
-// already contain the schema. It returns the number of targets loaded.
+// already contain the schema. It also writes the graph's quotient graphs
+// (quotient.go), which the exploration front-ends read back instead of deriving
+// them from the loaded rows. It returns the number of targets loaded.
 func Load(db *sql.DB, r io.Reader) (int, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -55,6 +57,9 @@ func Load(db *sql.DB, r io.Reader) (int, error) {
 		return n, err
 	}
 	if _, err := tx.Exec(`UPDATE edge SET to_id = (SELECT id FROM target WHERE target.label = edge.to_label)`); err != nil {
+		return n, err
+	}
+	if err := insertQuotients(tx); err != nil {
 		return n, err
 	}
 	return n, tx.Commit()

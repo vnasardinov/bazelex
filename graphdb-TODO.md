@@ -19,12 +19,14 @@ hashes differ, re-check that file's entries.
 
 | file | blob hash scanned | blob hash now |
 | --- | --- | --- |
-| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `98f19fa6693f5103e0c792ca36dee39379140141` |
-| `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `a242c30a4a20eab8e9da26c78a730dee96974183` |
-| `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `fd5e101192b21e1b9ef2c3eb9a2119f844d0b337` |
+| `internal/graphdb/load.go` | `0eb0c581e10b1ff5af39262c8fe01126796d759e` | `2d48d00e19bce1e2940d3fe0950edfbc08bad5ae` |
+| `internal/graphdb/schema.go` | `a242c30a4a20eab8e9da26c78a730dee96974183` | `b27906c259829d598030282c82965aa11b015e96` |
+| `internal/graphdb/load_test.go` | `db15716cbd137cabc460ee5b70560bcc8a405ab3` | `01199d8e1a69261ce3b4ef3aabc2ad218c802a0d` |
 
-The scan ran at commit `c1e35948f23dc7d37ad7e2988656fc4e1141b13f`, and the
-working tree matches it, so "scanned" and "now" are the same for every file.
+The scan ran at commit `c1e35948f23dc7d37ad7e2988656fc4e1141b13f`. The quotient
+tables have landed since (in `schema.go`, the new `quotient.go` and the call at
+the end of `Load`), so the "now" column is refreshed for all three files and the
+entries' line numbers are current for that revision.
 
 ## Beacon candidates
 
@@ -38,24 +40,24 @@ what is left to know.
     if the attribute does not create a build dependency". The field mirrors the
     storage, so the name is the beacon.
 
--   `load.go:154-168` — the `kind` literals ("rule", "source_file", ...) are the
+-   `load.go:159-173` — the `kind` literals ("rule", "source_file", ...) are the
     schema's vocabulary, documented at schema.go:12 and README.md:243, and each
     one is the case for its proto type (`bpb.Target_RULE` -> "rule"), so the
     mapping is already visible. A Go constant would be a second source of
     truth; the engine scan reached the same conclusion for its `kind = 'rule'`
     query (engine-TODO.md).
 
--   `load.go:232`, `load.go:271` — the `"visibility"` literals are the
+-   `load.go:237`, `load.go:276` — the `"visibility"` literals are the
     documented exception to "only explicitly set attributes are stored"
     (schema.go:35-36, README.md:256), and both sit in the same function a few
     lines apart, so the repetition marks the exception.
 
--   `load.go:319` — `splitLabel`'s comment shows only the `//pkg:name` form, but
+-   `load.go:324` — `splitLabel`'s comment shows only the `//pkg:name` form, but
     `TestSplitLabel` (load_test.go:188) asserts the no-colon form (`//a/b` ->
     `a/b`, `b`) and `//:root`, so the behavior is pinned by a test and the
     example is illustrative rather than the whole contract.
 
--   `load.go:43` — `Load`'s doc says it returns "the number of targets loaded",
+-   `load.go:47` — `Load`'s doc says it returns "the number of targets loaded",
     while on error it returns the partial count from `insertTargets`. The only
     caller checks the error and returns before reading the count
     (cmd/bazelex/main.go:79-82), so the count is used only on success; the

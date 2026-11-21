@@ -4,11 +4,13 @@ go_library(
     name = "graphdb",
     srcs = [
         "load.go",
+        "quotient.go",
         "schema.go",
     ],
     importpath = "github.com/vnasardinov/bazelex/internal/graphdb",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/quotient",
         "@com_github_bazel_contrib_buildtools_v10//build_proto",
         "@org_golang_google_protobuf//encoding/protodelim",
     ],

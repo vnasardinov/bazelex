@@ -78,10 +78,9 @@ links for longer results. The page has two sections:
 * Self-contained queries need no input: most depended-on targets, depth of
   every rule, heaviest targets, choke points, package coupling, package
   dependency cycles, rules tagged `manual`, and public rules used only in their
-  own package. All but heaviest targets and package cycles run when the page
-  loads. Those two are expensive, so they only run when you click their "Run
-  this query" link. Each label in the depth results links to the longest dependency
-  chain to that rule.
+  own package. All but heaviest targets run when the page loads; it is
+  expensive, so it only runs when you click its "Run this query" link. Each
+  label in the depth results links to the longest dependency chain to that rule.
 * Parameterized queries need a target label: transitive dependencies, impact of
   changing a target, the shortest dependency path between two targets, and the
   longest dependency chain to a target. The longest chain is the one whose
@@ -108,15 +107,16 @@ into facts: `target(Label, Kind, Package)`, `dep(From, To)` (rule-to-rule `deps`
 and `embed`, as above) and `edge(From, To, Attr)` (every dependency edge).
 Labels are Mangle *string* constants, so a program writes
 `dep("//foo:bar", X)` rather than `dep(//foo:bar, X)`: a Bazel label's leading
-`//` is not a valid name constant. Alongside the raw graph, the engine collapses
-it into quotient graphs and loads those as facts too: `qnode(Quotient, Node)`,
+`//` is not a valid name constant. Alongside the raw graph, the engine loads the
+quotient graphs `bazelex` wrote as facts too: `qnode(Quotient, Node)`,
 `qedge(Quotient, From, To, Weight)` and `qmember(Quotient, Node, Member)`, where
 the quotient is `"package"` or `"scc"`, the strongly connected components of the
-package graph. The page offers three examples, transitive dependencies
-(recursion), the rules nothing depends on (negation) and the hidden dependency
-cycles, and it renders every relation the program derives. A program may derive
-at most 500k facts before evaluation stops with an error, and each table shows
-its first 200 rows.
+package graph. They are read from the `qnode`, `qedge` and `qmember` tables, the
+same rows a SQL query sees. The page offers three examples, transitive
+dependencies (recursion), the rules nothing depends on (negation) and the hidden
+dependency cycles, and it renders every relation the program derives. A program
+may derive at most 500k facts before evaluation stops with an error, and each
+table shows its first 200 rows.
 
 ```sh
 bazel run //cmd/bazelex_ui -- --http=:6060 --db=graph.sqlite
@@ -256,6 +256,15 @@ Plain `//...` in `query` returns only rules, so the default pattern is
     row means the default. `visibility` is always stored, with the package's
     `default_visibility` applied. It is also still in `edge`.
   * `select()` values are not stored.
+* `qnode`, `qedge` and `qmember`: the graph's quotient graphs, written after
+  loading so that SQL can read them instead of re-deriving them.
+  `qnode(quotient, node)`, `qedge(quotient, from_node, to_node, weight)` and
+  `qmember(quotient, node, member)`, where `quotient` is `'package'` (the rule
+  graph collapsed by package) or `'scc'` (that graph condensed by its strongly
+  connected components, which merges each package dependency cycle into one
+  node and is always acyclic). They mirror the Datalog facts of the same names
+  one for one, and `qmember` has `'scc'` rows only: the package quotient's
+  members are rules, which `target` already holds.
 * `schema.go` documents the columns.
 
 ## Results on the buildtools repo
@@ -283,10 +292,11 @@ Plain `//...` in `query` returns only rules, so the default pattern is
 
 ## Schema
 
-See [`internal/graphdb/schema.go`](internal/graphdb/schema.go). Three tables: `target` (one row per rule, source
-file, generated file, ...), `attribute` (non-label attribute values) and `edge` (one row per dependency, tagged with the
-attribute it came from and whether it came from a `select()` branch). A view, `rule_dep`, selects the
-rule-to-rule `deps`/`embed` edges that the recursive queries below build on.
+See [`internal/graphdb/schema.go`](internal/graphdb/schema.go). Six tables: `target` (one row per rule, source
+file, generated file, ...), `attribute` (non-label attribute values), `edge` (one row per dependency, tagged with the
+attribute it came from and whether it came from a `select()` branch), and the quotient tables `qnode`, `qedge` and
+`qmember`, which hold the package graph and its SCC condensation so that SQL can read them rather than re-deriving
+them. A view, `rule_dep`, selects the rule-to-rule `deps`/`embed` edges that the recursive queries below build on.
 
 ## Example queries
 
@@ -329,14 +339,16 @@ WHERE t.kind = 'rule'
 
 ### More recursive queries
 
-These are built on the `rule_dep(from_id, to_id)` view: rule-to-rule dependency
-edges, with `attr` limited to `deps` and `embed`. The view is defined in the
-schema. Query `edge` directly instead (as the shortest-path query does) if you
-want `data` as well for runtime dependencies. Leave `visibility` and the
-implicit `$...`/`:...` attributes out. Cycles can't make these run forever: the
-queries that track paths have a depth limit, the depth query is bounded by the
-number of rules, and the others use `UNION`, which drops duplicate rows. See
-[the depth query](#more-recursive-queries) for why cycles are possible at all.
+These are built on the `rule_dep(from_id, to_id)` view — rule-to-rule
+dependency edges, with `attr` limited to `deps` and `embed` — except the
+package-cycle query, which reads the `qmember` table that `bazelex` writes. The
+view is defined in the schema. Query `edge` directly instead (as the
+shortest-path query does) if you want `data` as well for runtime dependencies.
+Leave `visibility` and the implicit `$...`/`:...` attributes out. Cycles can't
+make these run forever: the queries that track paths have a depth limit, the
+depth query is bounded by the number of rules, and the others use `UNION`, which
+drops duplicate rows. See [the depth query](#more-recursive-queries) for why
+cycles are possible at all.
 
 Direct and transitive impact of changing a target, that is everything that
 (transitively) depends on it:
@@ -446,8 +458,23 @@ ORDER BY edges + back_edges DESC, edges DESC, a.from_pkg, a.to_pkg LIMIT 10;
 Package dependency cycles: groups of packages that depend on each other,
 directly or through other packages (the strongly connected components of the
 package graph). Bazel allows this as long as no rules form a cycle, but such
-packages can't be layered. The query computes which packages each package can
-reach, then names each group after its smallest member:
+packages can't be layered. `bazelex` writes the answer at load time, so this is
+a read of `qmember`, which names each group after its smallest member:
+
+```sql
+-- Only a component of more than one package is a cycle.
+SELECT node AS comp, COUNT(*) AS packages, GROUP_CONCAT(member, ', ') AS members
+FROM qmember WHERE quotient = 'scc'
+GROUP BY node HAVING COUNT(*) > 1
+ORDER BY packages DESC, node;
+```
+
+`qedge` holds the same graph at component granularity, so
+`SELECT from_node, to_node, weight FROM qedge WHERE quotient = 'scc'` is the
+package graph with each cycle collapsed into one node, which is acyclic and can
+be layered. A database without the quotient tables (one written by hand, say)
+can still get the same answer out of `rule_dep`. This computes which packages
+each package can reach, then names each group after its smallest member:
 
 ```sql
 WITH RECURSIVE
@@ -476,7 +503,8 @@ FROM member GROUP BY comp ORDER BY packages DESC, comp;
 ```
 
 The reachability set can have up to one row per pair of packages, so this is
-slow on large graphs (about 9 seconds on TensorFlow).
+slow on large graphs (about 9 seconds on TensorFlow); reading `qmember` instead
+is why `bazelex` writes the tables.
 
 Heaviest targets: how many rules each one pulls in transitively. This is the
 "how much does building this cost" number, and it is the most expensive query

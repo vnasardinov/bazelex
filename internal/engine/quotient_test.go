@@ -10,13 +10,21 @@ import (
 )
 
 // cycleEngine returns an engine over a fixture whose packages are a <-> b and
-// c -> b: a and b form a dependency cycle, and c depends on it.
+// c -> b: a and b form a dependency cycle, and c depends on it. Its quotient
+// tables are the ones bazelex writes for that graph, which the engine reads
+// back rather than deriving.
 func cycleEngine(t *testing.T) *Engine {
 	t.Helper()
 	return fixtureEngine(t,
 		`INSERT INTO target(id,label,kind,package,name) VALUES
 		  (1,'//a:r','rule','a','r'),(2,'//b:r','rule','b','r'),(3,'//c:r','rule','c','r')`,
 		`INSERT INTO edge VALUES (1,'//b:r',2,'deps',0,0),(2,'//a:r',1,'deps',0,0),(3,'//b:r',2,'deps',0,0)`,
+		`INSERT INTO qnode(quotient,node) VALUES
+		  ('package','a'),('package','b'),('package','c'),('scc','a'),('scc','c')`,
+		`INSERT INTO qedge(quotient,from_node,to_node,weight) VALUES
+		  ('package','a','b',1),('package','b','a',1),('package','c','b',1),('scc','c','a',1)`,
+		`INSERT INTO qmember(quotient,node,member) VALUES
+		  ('scc','a','a'),('scc','a','b'),('scc','c','c')`,
 	)
 }
 
